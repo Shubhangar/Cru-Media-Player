@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../library/library_store.dart';
 import 'eq.dart';
 import 'format.dart';
 import 'models.dart';
@@ -25,10 +26,13 @@ class Bookmark {
 
 /// Owns the mpv-backed [Player] and the UI-level state around it.
 class PlayerController extends ChangeNotifier {
-  PlayerController({SettingsStore? settings})
+  PlayerController({SettingsStore? settings, this.library})
     : settings = settings ?? SettingsStore();
 
   final SettingsStore settings;
+
+  /// History, playlists and sources. Null in contexts without a library.
+  final LibraryStore? library;
   final Player player = Player(
     configuration: const PlayerConfiguration(title: 'Cone Player'),
   );
@@ -64,7 +68,11 @@ class PlayerController extends ChangeNotifier {
 
   // ---- Loading ----------------------------------------------------------
 
-  Future<void> openAll(List<String> uris, {bool append = false}) async {
+  Future<void> openAll(
+    List<String> uris, {
+    bool append = false,
+    int start = 0,
+  }) async {
     if (uris.isEmpty) return;
     final medias = uris.map(Media.new).toList();
     if (append && player.state.playlist.medias.isNotEmpty) {
@@ -73,11 +81,39 @@ class PlayerController extends ChangeNotifier {
       }
       notify('Added ${medias.length} to queue');
     } else {
-      await player.open(Playlist(medias), play: true);
+      await player.open(
+        Playlist(medias, index: start.clamp(0, medias.length - 1)),
+        play: true,
+      );
       bookmarks.clear();
       notifyListeners();
     }
   }
+
+  /// Saves progress, unloads everything and returns to the home hub.
+  Future<void> closeMedia([String? key]) async {
+    _recordProgress();
+    _trackedUri = null;
+    resumeOffer = null;
+    await player.stop();
+    bookmarks.clear();
+    notify('Closed', key);
+    notifyListeners();
+  }
+
+  /// Inserts [uris] right after the current item.
+  Future<void> playNext(List<String> uris) async {
+    if (player.state.playlist.medias.isEmpty) return openAll(uris);
+    var at = player.state.playlist.index + 1;
+    for (final u in uris) {
+      await player.add(Media(u));
+      await player.move(player.state.playlist.medias.length - 1, at++);
+    }
+    notify(uris.length == 1 ? 'Playing next' : '${uris.length} playing next');
+  }
+
+  List<String> get queueUris =>
+      player.state.playlist.medias.map((m) => m.uri).toList();
 
   Future<void> loadSubtitle(String uri) async {
     await player.setSubtitleTrack(SubtitleTrack.uri(uri));
@@ -213,8 +249,108 @@ class PlayerController extends ChangeNotifier {
     if (audioLanguages.isNotEmpty) await _prop('alang', audioLanguages);
     if (subtitleLanguages.isNotEmpty) await _prop('slang', subtitleLanguages);
     _completedSub = player.stream.completed.listen((done) {
+      if (done) _recordProgress(finished: true);
       if (done && sleepAtEnd) _finishSleep();
     });
+    if (library != null) {
+      _historySubs = [
+        player.stream.duration.listen((_) => _checkFileChange()),
+        player.stream.playlist.listen((_) => _checkFileChange()),
+        player.stream.position.listen(_onPosition),
+      ];
+    }
+    notifyListeners();
+  }
+
+  // ---- History & resume ---------------------------------------------------
+
+  /// Set when the file that just opened was left unfinished last time.
+  HistoryEntry? resumeOffer;
+  String? _trackedUri;
+  DateTime _lastSaved = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime? _lastThumb;
+  List<StreamSubscription>? _historySubs;
+
+  String? get currentUri {
+    final pl = player.state.playlist;
+    if (pl.medias.isEmpty || pl.index < 0 || pl.index >= pl.medias.length) {
+      return null;
+    }
+    return pl.medias[pl.index].uri;
+  }
+
+  /// Audio file, or a "video" that is only embedded cover art.
+  bool get isAudioOnly {
+    final v = player.state.tracks.video.where(
+      (t) => t.id != 'auto' && t.id != 'no',
+    );
+    final hasAudio = player.state.tracks.audio.any(
+      (t) => t.id != 'auto' && t.id != 'no',
+    );
+    if (!hasAudio) return false;
+    return v.isEmpty || v.every((t) => t.albumart == true || t.image == true);
+  }
+
+  void _checkFileChange() {
+    final uri = currentUri;
+    if (uri == null || player.state.duration <= Duration.zero) return;
+    if (uri == _trackedUri) return;
+    _trackedUri = uri;
+    _lastThumb = null;
+    _lastSaved = DateTime.now();
+    final h = library!.history[uri];
+    resumeOffer = (h != null && h.resumable) ? h : null;
+    notifyListeners();
+  }
+
+  void _onPosition(Duration pos) {
+    final uri = currentUri;
+    if (uri == null || uri != _trackedUri) return;
+    if (DateTime.now().difference(_lastSaved) > const Duration(seconds: 5)) {
+      _recordProgress();
+    }
+    // Card frame: refreshed at most once a minute so "Continue watching"
+    // shows roughly where you stopped. Needs the history entry to exist.
+    final due =
+        _lastThumb == null ||
+        DateTime.now().difference(_lastThumb!) > const Duration(minutes: 1);
+    if (due && library!.history[uri] != null && !isAudioOnly) {
+      _lastThumb = DateTime.now();
+      player.screenshot().then((jpeg) {
+        if (jpeg != null) library!.saveThumb(uri, jpeg);
+      });
+    }
+  }
+
+  void _recordProgress({bool finished = false}) {
+    final uri = _trackedUri;
+    final dur = player.state.duration;
+    if (library == null || uri == null || dur <= Duration.zero) return;
+    _lastSaved = DateTime.now();
+    library!.recordProgress(
+      uri,
+      title: displayName(uri),
+      position: finished ? dur : player.state.position,
+      duration: dur,
+      isAudio: isAudioOnly,
+    );
+  }
+
+  Future<void> acceptResume() async {
+    final h = resumeOffer;
+    resumeOffer = null;
+    notifyListeners();
+    if (h == null) return;
+    await player.seek(Duration(milliseconds: h.positionMs));
+    await player.play();
+    notify(
+      'Resumed at ${formatDuration(Duration(milliseconds: h.positionMs))}',
+    );
+  }
+
+  void dismissResume() {
+    if (resumeOffer == null) return;
+    resumeOffer = null;
     notifyListeners();
   }
 
@@ -439,6 +575,10 @@ class PlayerController extends ChangeNotifier {
     };
   }
 
+  /// Title / artist / album tags of the current file.
+  Future<Map<String, String>> trackTags() async =>
+      parseTags(await _get('metadata'));
+
   /// Raises subtitles above the bottom bar (mpv units: 720-line script res).
   Future<void> liftSubtitles(bool lift) =>
       _prop('sub-margin-y', lift ? '100' : '22');
@@ -451,6 +591,11 @@ class PlayerController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _recordProgress();
+    library?.save();
+    for (final sub in _historySubs ?? const <StreamSubscription>[]) {
+      sub.cancel();
+    }
     _sleepTimer?.cancel();
     _eqDebounce?.cancel();
     _completedSub?.cancel();

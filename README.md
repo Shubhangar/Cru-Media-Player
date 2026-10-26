@@ -20,7 +20,11 @@ flutter run -d macos     # or: -d windows / -d linux
 - media_kit's bundled libmpv/ffmpeg has **no ffmpeg video filters** (`vf`).
   Flips are therefore a Flutter transform over the video, and picture
   controls use mpv's GPU options. Audio filters (`af`, used by the EQ) work.
-- Subtitle styles and EQ settings persist via `shared_preferences`.
+- Subtitle styles and EQ settings persist via `shared_preferences`; the
+  library (history, playlists, pins, folders, channel lists) is
+  `library.json` in the app-support folder, with thumbnails in `thumbs/`.
+- The bundled ffmpeg has no PNG decoder, so cover art is extracted by the
+  app (`lib/library/cover_art.dart`) rather than by mpv.
 
 ## Tests
 
@@ -60,6 +64,9 @@ Windows and Linux binaries must be built on those systems (or in CI).
 | Ctrl/⌘ + V | Play link/path from clipboard |
 | Ctrl/⌘ + L | Queue & bookmarks panel |
 | Ctrl/⌘ + I | Inspector (subtitles, audio, video, playback) |
+| Ctrl/⌘ + Shift + L | Library |
+| Ctrl/⌘ + W | Close media (back to Home) |
+| Enter / Esc | Accept / dismiss the resume prompt |
 
 ## Mouse & trackpad
 
@@ -85,7 +92,16 @@ Windows and Linux binaries must be built on those systems (or in CI).
      upscaling quality, HDR tone mapping.
    - Playback: speed, reverse playback, sleep timer (minutes or end of file),
      overlay toggles, formatted media info.
-3. Library, home hub, resume banner, IPTV channel lists.
+3. ✅ Library & home:
+   - Home hub: continue watching (with frame thumbnails and progress), pins,
+     playlists, recently played.
+   - Resume prompt near the controls when reopening an unfinished file.
+   - Library: Videos, Music, Network streams, Playlists, History; breadcrumbs,
+     search, Grid/List/Detail views, sorting incl. unwatched/watched first.
+   - IPTV: M3U channel lists with groups and logos, auto-refresh when stale,
+     channel zapping with N/P.
+   - Queue panel Library tab: drag items into the queue while playing.
+   - Music layout with cover art (embedded M4A/MP3/FLAC art or folder images).
 4. Seek thumbnails, waveform, subtitle timeline sync, OpenSubtitles.
 5. Settings (10 panels), layout customizer, onboarding, shaders, multi-window sync.
 6. Convert, capture device, cast.

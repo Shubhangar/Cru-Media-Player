@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'library/library_store.dart';
 import 'theme.dart';
 import 'ui/player_screen.dart';
 
@@ -28,18 +30,22 @@ Future<void> main(List<String> args) async {
   final files = args
       .where((a) => a.contains('://') || File(a).existsSync())
       .toList();
-  runApp(ConePlayerApp(initialFiles: files));
+  final support = await getApplicationSupportDirectory();
+  final library = LibraryStore(support);
+  await library.load();
+  runApp(ConePlayerApp(initialFiles: files, library: library));
 }
 
 class ConePlayerApp extends StatelessWidget {
   final List<String> initialFiles;
-  const ConePlayerApp({super.key, this.initialFiles = const []});
+  final LibraryStore? library;
+  const ConePlayerApp({super.key, this.initialFiles = const [], this.library});
 
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Cone Player',
     debugShowCheckedModeBanner: false,
     theme: buildConeTheme(),
-    home: PlayerScreen(initialFiles: initialFiles),
+    home: PlayerScreen(initialFiles: initialFiles, library: library),
   );
 }

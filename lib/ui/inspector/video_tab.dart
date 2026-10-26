@@ -256,8 +256,8 @@ class _VideoTabState extends State<VideoTab> {
         ),
         ChipRow([
           for (final (id, label) in [
-            ('bilinear', 'Fast'),
-            ('lanczos', 'Default'),
+            ('bilinear', 'Fast (default)'),
+            ('spline36', 'Balanced'),
             ('ewa_lanczossharp', 'Sharp'),
           ])
             ConeChip(

@@ -10,14 +10,20 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../library/library_store.dart';
 import '../player/media_loader.dart';
 import '../player/player_controller.dart';
 import '../theme.dart';
 import 'cone_volume.dart';
 import 'flyouts.dart';
 import 'osd.dart';
+import 'home/home_view.dart';
 import 'inspector/inspector_panel.dart';
+import 'library/library_screen.dart';
+import 'library/media_widgets.dart';
+import 'music_view.dart';
 import 'queue_panel.dart';
+import 'resume_banner.dart';
 import 'seek_bar.dart';
 
 final bool _isMac = Platform.isMacOS;
@@ -26,10 +32,12 @@ final String _mod = _isMac ? '⌘' : 'Ctrl';
 class PlayerScreen extends StatefulWidget {
   final List<String> initialFiles;
   final PlayerController? controller;
+  final LibraryStore? library;
   const PlayerScreen({
     super.key,
     this.initialFiles = const [],
     this.controller,
+    this.library,
   });
 
   @override
@@ -37,7 +45,34 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  late final c = widget.controller ?? PlayerController();
+  late final c = widget.controller ?? PlayerController(library: widget.library);
+  LibraryStore? get _lib => c.library;
+
+  // Full-window library over the player.
+  bool _libraryOpen = false;
+  LibrarySection _librarySection = LibrarySection.videos;
+  String? _libraryFolder, _librarySource;
+
+  void _openLibrary({
+    String? folder,
+    String? sourceUrl,
+    LibrarySection? section,
+  }) => setState(() {
+    _libraryOpen = true;
+    _librarySection = section ?? _librarySection;
+    _libraryFolder = folder;
+    _librarySource = sourceUrl;
+    _queueOpen = _inspectorOpen = false;
+  });
+
+  late final _actions = LibraryActions(
+    play: (uris, {int start = 0}) {
+      setState(() => _libraryOpen = false);
+      c.openAll(uris, start: start);
+    },
+    enqueue: (uris) => c.openAll(uris, append: true),
+    playNext: c.playNext,
+  );
   late final loader = MediaLoader(c);
   final _focus = FocusNode();
   final _contextMenu = MenuController();
@@ -112,10 +147,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   bool get _hasMedia => p.state.playlist.medias.isNotEmpty;
 
+  // Music has nothing to cover up, so its controls stay put.
   bool get _showTop =>
-      !c.uiHidden && (!_hasMedia || !p.state.playing || _nearTop);
+      !c.uiHidden &&
+      (!_hasMedia || !p.state.playing || _nearTop || c.isAudioOnly);
+  // Nothing to control on the home hub, so the bottom bar stays away.
   bool get _showBottom =>
-      !c.uiHidden && (!_hasMedia || !p.state.playing || _nearBottom);
+      !c.uiHidden &&
+      _hasMedia &&
+      (!p.state.playing || _nearBottom || c.isAudioOnly);
 
   void _onHover(PointerHoverEvent e, double height) {
     final y = e.localPosition.dy;
@@ -202,14 +242,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
       } else if (k == LogicalKeyboardKey.keyV) {
         loader.playClipboard(combo('V'));
       } else if (k == LogicalKeyboardKey.keyL) {
-        _toggleQueue();
+        if (shift && _lib != null) {
+          _libraryOpen ? setState(() => _libraryOpen = false) : _openLibrary();
+        } else {
+          _toggleQueue();
+        }
       } else if (k == LogicalKeyboardKey.keyI) {
         _toggleInspector();
+      } else if (k == LogicalKeyboardKey.keyW && _hasMedia) {
+        c.closeMedia(combo('W'));
       } else {
         return KeyEventResult.ignored;
       }
       return KeyEventResult.handled;
     }
+
+    if (c.resumeOffer != null &&
+        (k == LogicalKeyboardKey.enter || k == LogicalKeyboardKey.escape)) {
+      k == LogicalKeyboardKey.enter ? c.acceptResume() : c.dismissResume();
+      return KeyEventResult.handled;
+    }
+    if (_libraryOpen && k == LogicalKeyboardKey.escape) {
+      setState(() => _libraryOpen = false);
+      return KeyEventResult.handled;
+    }
+    if (_libraryOpen) return KeyEventResult.ignored;
 
     if (k == LogicalKeyboardKey.space || k == LogicalKeyboardKey.keyK) {
       c.togglePlay(k == LogicalKeyboardKey.space ? 'Space' : 'K');
@@ -367,7 +424,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 child: Stack(
                   children: [
                     Positioned.fill(child: _videoLayer(box)),
-                    if (!_hasMedia) Positioned.fill(child: _emptyState()),
+                    if (!_hasMedia)
+                      Positioned.fill(
+                        child: _lib == null
+                            ? _emptyState()
+                            : HomeView(
+                                library: _lib!,
+                                actions: _actions,
+                                onOpenFile: loader.openFiles,
+                                onOpenFolder: loader.openFolder,
+                                onOpenStream: () => loader.openStream(context),
+                                onOpenLibrary: _openLibrary,
+                              ),
+                      ),
                     if (_dragging) Positioned.fill(child: _dropHint()),
                     Positioned(
                       top: 0,
@@ -405,6 +474,42 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         onLoadSubtitle: loader.openSubtitle,
                       ),
                     ),
+                    if (c.resumeOffer != null && !_libraryOpen)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 128,
+                        child: Center(
+                          child: ResumeBanner(
+                            key: ValueKey(c.resumeOffer!.uri),
+                            entry: c.resumeOffer!,
+                            onResume: c.acceptResume,
+                            onDismiss: c.dismissResume,
+                          ),
+                        ),
+                      ),
+                    if (_lib != null)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          ignoring: !_libraryOpen,
+                          child: AnimatedOpacity(
+                            opacity: _libraryOpen ? 1 : 0,
+                            duration: const Duration(milliseconds: 160),
+                            child: _libraryOpen
+                                ? LibraryScreen(
+                                    library: _lib!,
+                                    actions: _actions,
+                                    currentQueue: () => c.queueUris,
+                                    initialSection: _librarySection,
+                                    initialFolder: _libraryFolder,
+                                    initialSourceUrl: _librarySource,
+                                    onClose: () =>
+                                        setState(() => _libraryOpen = false),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
                     Positioned(
                       top: 70,
                       left: 0,
@@ -471,15 +576,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
             PointerDeviceKind.trackpad,
           },
           // Flips are a GPU transform here (cheap, works with hwdec).
-          child: Transform.scale(
-            scaleX: c.adjust.hflip ? -1 : 1,
-            scaleY: c.adjust.vflip ? -1 : 1,
-            child: Video(
-              controller: c.video,
-              controls: NoVideoControls,
-              fill: Colors.black,
-            ),
-          ),
+          child: c.isAudioOnly
+              ? MusicView(c: c)
+              : Transform.scale(
+                  scaleX: c.adjust.hflip ? -1 : 1,
+                  scaleY: c.adjust.vflip ? -1 : 1,
+                  child: Video(
+                    controller: c.video,
+                    controls: NoVideoControls,
+                    fill: Colors.black,
+                  ),
+                ),
         ),
       ),
     );
@@ -579,12 +686,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 icon: Icons.content_paste,
                 onTap: () => loader.playClipboard(),
               ),
+              if (_hasMedia)
+                FlyoutItem(
+                  label: 'Close media',
+                  detail: '$_mod+W',
+                  icon: Icons.close,
+                  onTap: () => c.closeMedia(),
+                ),
               const Divider(height: 10, color: ConeColors.border),
               FlyoutItem(
                 label: 'Load subtitle…',
                 icon: Icons.subtitles_outlined,
                 onTap: loader.openSubtitle,
               ),
+              if (_lib != null)
+                FlyoutItem(
+                  label: 'Library',
+                  detail: '$_mod+Shift+L',
+                  icon: Icons.video_library_outlined,
+                  onTap: _openLibrary,
+                ),
               FlyoutItem(
                 label: 'Inspector',
                 detail: '$_mod+I',
@@ -617,6 +738,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
               ),
             ),
           ),
+          if (_lib != null)
+            ControlIcon(
+              icon: Icons.video_library_outlined,
+              tooltip: 'Library ($_mod+Shift+L)',
+              active: _libraryOpen,
+              onPressed: () => _libraryOpen
+                  ? setState(() => _libraryOpen = false)
+                  : _openLibrary(),
+            ),
           ControlIcon(
             icon: Icons.tune,
             tooltip: 'Inspector ($_mod+I)',

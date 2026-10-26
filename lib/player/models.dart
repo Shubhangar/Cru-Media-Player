@@ -141,7 +141,8 @@ class VideoAdjust {
   final int rotation; // 0/90/180/270
   final double zoom; // mpv video-zoom (log2)
   final String aspect; // 'auto' or 'w:h'
-  /// GPU upscaler: 'bilinear' (fast), 'lanczos' (default), 'ewa_lanczossharp'.
+  /// GPU upscaler: 'bilinear' (media_kit's default, fastest), 'spline36',
+  /// 'ewa_lanczossharp' (sharpest).
   /// Flips are drawn by Flutter (see PlayerScreen): this libmpv build ships
   /// without ffmpeg video filters.
   final String scaler;
@@ -157,7 +158,7 @@ class VideoAdjust {
     this.rotation = 0,
     this.zoom = 0,
     this.aspect = 'auto',
-    this.scaler = 'lanczos',
+    this.scaler = 'bilinear',
     this.toneMapHdr = true,
   });
 
