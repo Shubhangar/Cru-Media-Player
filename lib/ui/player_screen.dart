@@ -16,6 +16,7 @@ import '../theme.dart';
 import 'cone_volume.dart';
 import 'flyouts.dart';
 import 'osd.dart';
+import 'inspector/inspector_panel.dart';
 import 'queue_panel.dart';
 import 'seek_bar.dart';
 
@@ -48,10 +49,28 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Timer? _idleTimer;
 
   bool _queueOpen = false;
+  bool _inspectorOpen = false;
+  InspectorTab _inspectorTab = InspectorTab.subtitles;
+
+  // The queue and the inspector share the right edge; one at a time.
+  void _toggleQueue() => setState(() {
+    _queueOpen = !_queueOpen;
+    if (_queueOpen) _inspectorOpen = false;
+  });
+
+  void _toggleInspector([InspectorTab? tab]) => setState(() {
+    if (tab != null && _inspectorOpen && tab != _inspectorTab) {
+      _inspectorTab = tab;
+      return;
+    }
+    if (tab != null) _inspectorTab = tab;
+    _inspectorOpen = !_inspectorOpen;
+    if (_inspectorOpen) _queueOpen = false;
+  });
   bool _fullscreen = false;
   bool _pip = false;
   Rect? _boundsBeforePip;
-  int _brightness = 0;
+  double _brightness = 0; // accumulates small gesture deltas
   bool _dragging = false;
   bool _subsLifted = false;
 
@@ -75,7 +94,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     _subs.add(p.stream.playlist.listen((_) => windowManager.setTitle(c.title)));
     c.addListener(() => mounted ? setState(() {}) : null);
-    if (widget.initialFiles.isNotEmpty) c.openAll(widget.initialFiles);
+    c.init().then((_) {
+      if (widget.initialFiles.isNotEmpty) c.openAll(widget.initialFiles);
+    });
   }
 
   @override
@@ -157,6 +178,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (e is! KeyDownEvent && e is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
+    // Typing in a text field must not trigger player shortcuts.
+    final focused = FocusManager.instance.primaryFocus?.context;
+    if (focused != null &&
+        (focused.widget is EditableText ||
+            focused.findAncestorWidgetOfExactType<EditableText>() != null)) {
+      return KeyEventResult.ignored;
+    }
     final hk = HardwareKeyboard.instance;
     final mod = _isMac ? hk.isMetaPressed : hk.isControlPressed;
     final shift = hk.isShiftPressed;
@@ -174,7 +202,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       } else if (k == LogicalKeyboardKey.keyV) {
         loader.playClipboard(combo('V'));
       } else if (k == LogicalKeyboardKey.keyL) {
-        setState(() => _queueOpen = !_queueOpen);
+        _toggleQueue();
+      } else if (k == LogicalKeyboardKey.keyI) {
+        _toggleInspector();
       } else {
         return KeyEventResult.ignored;
       }
@@ -224,10 +254,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     } else if (k == LogicalKeyboardKey.keyR) {
       c.rotate('R');
     } else if (k == LogicalKeyboardKey.keyZ) {
-      c.setZoom(c.zoom + 0.1);
+      c.setZoom(c.adjust.zoom + 0.1);
       c.notify('Zoom ${(100 * _zoomFactor).round()}%', 'Z');
     } else if (k == LogicalKeyboardKey.keyX) {
-      c.setZoom(c.zoom - 0.1);
+      c.setZoom(c.adjust.zoom - 0.1);
       c.notify('Zoom ${(100 * _zoomFactor).round()}%', 'X');
     } else {
       return KeyEventResult.ignored;
@@ -236,7 +266,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   // mpv's video-zoom is log2-scaled.
-  double get _zoomFactor => math.pow(2, c.zoom).toDouble();
+  double get _zoomFactor => math.pow(2, c.adjust.zoom).toDouble();
 
   // ---- Gestures (trackpad / touch / mouse) -----------------------------
 
@@ -244,9 +274,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // Swipe up = increase. Left half = brightness, right half = volume.
     final delta = -dy * 0.25;
     if (localX < width / 2) {
-      _brightness = (_brightness + delta).round().clamp(-100, 100);
-      c.setAdjust('brightness', _brightness);
-      c.notify('Brightness $_brightness');
+      if (_brightness.round() != c.adjust.brightness) {
+        _brightness = c.adjust.brightness.toDouble();
+      }
+      _brightness = (_brightness + delta).clamp(-100.0, 100.0);
+      c.setVideo(c.adjust.copyWith(brightness: _brightness.round()));
+      c.notify('Brightness ${_brightness.round()}');
     } else {
       c.setVolume(p.state.volume + delta, 'Swipe');
     }
@@ -361,6 +394,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     ),
                     Positioned(
                       top: 70,
+                      right: 0,
+                      bottom: 0,
+                      child: InspectorPanel(
+                        open: _inspectorOpen,
+                        controller: c,
+                        tab: _inspectorTab,
+                        onTab: (t) => setState(() => _inspectorTab = t),
+                        onClose: () => setState(() => _inspectorOpen = false),
+                        onLoadSubtitle: loader.openSubtitle,
+                      ),
+                    ),
+                    Positioned(
+                      top: 70,
                       left: 0,
                       right: 0,
                       child: Center(child: Osd(messages: c.osd)),
@@ -397,7 +443,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         // Trackpad: two-finger vertical swipe & pinch.
         onPointerPanZoomUpdate: (e) {
           if ((e.scale - 1).abs() > 0.02) {
-            c.setZoom(c.zoom + (e.scale - 1) * 0.05);
+            c.setZoom(c.adjust.zoom + (e.scale - 1) * 0.05);
           } else if (e.panDelta.dy.abs() > e.panDelta.dx.abs()) {
             _sideAdjust(e.localPosition.dx, box.maxWidth, e.panDelta.dy);
           }
@@ -424,10 +470,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
             PointerDeviceKind.mouse,
             PointerDeviceKind.trackpad,
           },
-          child: Video(
-            controller: c.video,
-            controls: NoVideoControls,
-            fill: Colors.black,
+          // Flips are a GPU transform here (cheap, works with hwdec).
+          child: Transform.scale(
+            scaleX: c.adjust.hflip ? -1 : 1,
+            scaleY: c.adjust.vflip ? -1 : 1,
+            child: Video(
+              controller: c.video,
+              controls: NoVideoControls,
+              fill: Colors.black,
+            ),
           ),
         ),
       ),
@@ -451,7 +502,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     FlyoutItem(label: 'Rotate 90°', detail: 'R', onTap: () => c.rotate()),
     FlyoutItem(
       label: 'Flip horizontally',
-      selected: c.flipped,
+      selected: c.adjust.hflip,
       onTap: c.toggleFlip,
     ),
     SubmenuButton(
@@ -460,7 +511,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         for (final a in ['auto', '16:9', '4:3', '21:9', '1:1', '2.35:1'])
           FlyoutItem(
             label: a == 'auto' ? 'Default' : a,
-            selected: c.aspect == a,
+            selected: c.adjust.aspect == a,
             onTap: () => c.setAspect(a),
           ),
       ],
@@ -535,10 +586,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 onTap: loader.openSubtitle,
               ),
               FlyoutItem(
+                label: 'Inspector',
+                detail: '$_mod+I',
+                icon: Icons.tune,
+                onTap: _toggleInspector,
+              ),
+              FlyoutItem(
                 label: 'Queue & bookmarks',
                 detail: '$_mod+L',
                 icon: Icons.queue_music,
-                onTap: () => setState(() => _queueOpen = !_queueOpen),
+                onTap: () => _toggleQueue(),
               ),
             ],
             builder: (context, ctrl, _) => ControlIcon(
@@ -559,6 +616,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 fontWeight: FontWeight.w500,
               ),
             ),
+          ),
+          ControlIcon(
+            icon: Icons.tune,
+            tooltip: 'Inspector ($_mod+I)',
+            active: _inspectorOpen,
+            onPressed: _toggleInspector,
           ),
         ],
       ),
@@ -636,7 +699,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 icon: Icons.queue_music,
                 tooltip: 'Queue ($_mod+L)',
                 active: _queueOpen,
-                onPressed: () => setState(() => _queueOpen = !_queueOpen),
+                onPressed: () => _toggleQueue(),
               ),
               FlyoutButton(
                 icon: Icons.subtitles_outlined,

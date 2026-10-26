@@ -15,6 +15,13 @@ flutter run -d macos     # or: -d windows / -d linux
 - You can pass files or URLs on the command line:
   `cone_player.app/Contents/MacOS/cone_player movie.mkv`.
 
+## Engine notes
+
+- media_kit's bundled libmpv/ffmpeg has **no ffmpeg video filters** (`vf`).
+  Flips are therefore a Flutter transform over the video, and picture
+  controls use mpv's GPU options. Audio filters (`af`, used by the EQ) work.
+- Subtitle styles and EQ settings persist via `shared_preferences`.
+
 ## Tests
 
 ```bash
@@ -52,6 +59,7 @@ Windows and Linux binaries must be built on those systems (or in CI).
 | Ctrl/⌘ + U | Open network stream |
 | Ctrl/⌘ + V | Play link/path from clipboard |
 | Ctrl/⌘ + L | Queue & bookmarks panel |
+| Ctrl/⌘ + I | Inspector (subtitles, audio, video, playback) |
 
 ## Mouse & trackpad
 
@@ -65,7 +73,18 @@ Windows and Linux binaries must be built on those systems (or in CI).
 
 1. ✅ Core player: theme, control bar, cone volume, seek bar, auto-hide, subtitle/audio
    flyouts (with output-device switching), OSD, shortcuts, queue, bookmarks, PiP, gestures.
-2. Inspector sidebar (subtitle / audio / video / playback panels, EQ).
+2. ✅ Inspector sidebar:
+   - Subtitles: delay, live style preview, presets (built-in + saved), font,
+     relative/exact size, colours, outline, shadow, position, ASS override,
+     preferred languages.
+   - Audio: delay, EQ presets with curve previews, draggable parametric EQ
+     (frequency/gain/Q per band, auto pre-gain against clipping), preferred
+     languages.
+   - Video: looks previewed on the current frame before applying, live
+     brightness/contrast/saturation/gamma, rotate/flip/zoom/aspect, GPU
+     upscaling quality, HDR tone mapping.
+   - Playback: speed, reverse playback, sleep timer (minutes or end of file),
+     overlay toggles, formatted media info.
 3. Library, home hub, resume banner, IPTV channel lists.
 4. Seek thumbnails, waveform, subtitle timeline sync, OpenSubtitles.
 5. Settings (10 panels), layout customizer, onboarding, shaders, multi-window sync.

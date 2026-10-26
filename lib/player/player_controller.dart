@@ -4,6 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import 'eq.dart';
+import 'format.dart';
+import 'models.dart';
+import 'settings_store.dart';
+
 /// A short on-screen notice: what happened and which shortcut caused it.
 class OsdMessage {
   final String action;
@@ -20,6 +25,10 @@ class Bookmark {
 
 /// Owns the mpv-backed [Player] and the UI-level state around it.
 class PlayerController extends ChangeNotifier {
+  PlayerController({SettingsStore? settings})
+    : settings = settings ?? SettingsStore();
+
+  final SettingsStore settings;
   final Player player = Player(
     configuration: const PlayerConfiguration(title: 'Cone Player'),
   );
@@ -30,10 +39,22 @@ class PlayerController extends ChangeNotifier {
 
   final List<Bookmark> bookmarks = [];
   bool uiHidden = false;
-  double zoom = 0; // mpv video-zoom (log2 scale)
-  int rotation = 0;
-  bool flipped = false;
-  String aspect = 'auto';
+
+  // Inspector state.
+  VideoAdjust adjust = const VideoAdjust();
+  SubtitleStyle subStyle = const SubtitleStyle();
+  List<NamedSubtitleStyle> userSubPresets = [];
+  double subDelay = 0, audioDelay = 0;
+  List<EqBand> eqBands = eqPresets.first.bands;
+  bool eqEnabled = false;
+  String eqPresetId = 'flat';
+  String audioLanguages = '', subtitleLanguages = '';
+  bool reverse = false;
+  bool showWaveform = false, showSubtitleTimeline = false;
+  DateTime? sleepAt;
+  bool sleepAtEnd = false;
+  Timer? _sleepTimer, _eqDebounce;
+  StreamSubscription<bool>? _completedSub;
 
   NativePlayer? get _mpv =>
       player.platform is NativePlayer ? player.platform as NativePlayer : null;
@@ -148,40 +169,275 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---- Video adjustments (mpv properties) -------------------------------
+  // ---- mpv properties ----------------------------------------------------
 
-  Future<void> _prop(String name, String value) async =>
-      _mpv?.setProperty(name, value);
+  Future<void> _prop(String name, String value) async {
+    try {
+      await _mpv?.setProperty(name, value);
+    } catch (e) {
+      debugPrint('mpv: cannot set $name=$value: $e');
+    }
+  }
 
-  Future<void> setZoom(double z) async {
-    zoom = z.clamp(-2.0, 3.0).toDouble();
-    await _prop('video-zoom', zoom.toStringAsFixed(3));
+  Future<String> _get(String name) async {
+    try {
+      return await _mpv?.getProperty(name) ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// Sets only the properties whose values changed.
+  Future<void> _applyDiff(
+    Map<String, String> before,
+    Map<String, String> after, {
+    bool force = false,
+  }) async {
+    for (final e in after.entries) {
+      if (force || before[e.key] != e.value) await _prop(e.key, e.value);
+    }
+  }
+
+  /// Restores saved preferences and pushes them to mpv. Call once.
+  Future<void> init() async {
+    await settings.load();
+    subStyle = settings.subtitleStyle ?? subStyle;
+    userSubPresets = settings.subtitlePresets;
+    eqBands = settings.eqBands ?? eqBands;
+    eqEnabled = settings.eqEnabled;
+    eqPresetId = settings.eqPresetId;
+    audioLanguages = settings.audioLanguages;
+    subtitleLanguages = settings.subtitleLanguages;
+    await _applyDiff(const {}, subStyle.toMpv(), force: true);
+    if (eqEnabled) await _prop('af', buildEqFilter(eqBands));
+    if (audioLanguages.isNotEmpty) await _prop('alang', audioLanguages);
+    if (subtitleLanguages.isNotEmpty) await _prop('slang', subtitleLanguages);
+    _completedSub = player.stream.completed.listen((done) {
+      if (done && sleepAtEnd) _finishSleep();
+    });
     notifyListeners();
   }
 
-  Future<void> rotate([String? key]) async {
-    rotation = (rotation + 90) % 360;
-    await _prop('video-rotate', '$rotation');
-    notify('Rotate $rotation°', key);
+  // ---- Video --------------------------------------------------------------
+
+  Future<void> setVideo(VideoAdjust a) async {
+    final before = adjust.toMpv();
+    adjust = a;
     notifyListeners();
+    await _applyDiff(before, a.toMpv());
+  }
+
+  Future<void> resetVideo() async {
+    await setVideo(const VideoAdjust());
+    notify('Video reset');
+  }
+
+  Future<void> setZoom(double z) =>
+      setVideo(adjust.copyWith(zoom: z.clamp(-2.0, 3.0).toDouble()));
+
+  Future<void> rotate([String? key]) async {
+    await setVideo(adjust.copyWith(rotation: (adjust.rotation + 90) % 360));
+    notify('Rotate ${adjust.rotation}°', key);
   }
 
   Future<void> toggleFlip() async {
-    flipped = !flipped;
-    await _prop('vf', flipped ? 'hflip' : '');
-    notify(flipped ? 'Flip on' : 'Flip off');
-    notifyListeners();
+    await setVideo(adjust.copyWith(hflip: !adjust.hflip));
+    notify(adjust.hflip ? 'Flip on' : 'Flip off');
   }
 
   Future<void> setAspect(String a) async {
-    aspect = a;
-    await _prop('video-aspect-override', a == 'auto' ? 'no' : a);
+    await setVideo(adjust.copyWith(aspect: a));
     notify('Aspect $a');
+  }
+
+  // ---- Subtitles ----------------------------------------------------------
+
+  Future<void> setSubStyle(SubtitleStyle s) async {
+    final before = subStyle.toMpv();
+    subStyle = s;
+    settings.subtitleStyle = s;
+    notifyListeners();
+    await _applyDiff(before, s.toMpv());
+  }
+
+  void saveSubPreset(String name) {
+    userSubPresets = [
+      ...userSubPresets.where((p) => p.name != name),
+      NamedSubtitleStyle(name, subStyle),
+    ];
+    settings.subtitlePresets = userSubPresets;
+    notify('Saved style "$name"');
     notifyListeners();
   }
 
-  Future<void> setAdjust(String prop, int value) async =>
-      _prop(prop, '$value'); // brightness / contrast / saturation: -100..100
+  void deleteSubPreset(String name) {
+    userSubPresets = userSubPresets.where((p) => p.name != name).toList();
+    settings.subtitlePresets = userSubPresets;
+    notifyListeners();
+  }
+
+  Future<void> setSubDelay(double seconds) async {
+    subDelay = double.parse(seconds.clamp(-30.0, 30.0).toStringAsFixed(2));
+    notifyListeners();
+    await _prop('sub-delay', subDelay.toStringAsFixed(2));
+  }
+
+  // ---- Audio --------------------------------------------------------------
+
+  Future<void> setAudioDelay(double seconds) async {
+    audioDelay = double.parse(seconds.clamp(-10.0, 10.0).toStringAsFixed(2));
+    notifyListeners();
+    await _prop('audio-delay', audioDelay.toStringAsFixed(2));
+  }
+
+  /// Updates the equaliser. Filter rebuilds are debounced so dragging a
+  /// band does not stutter the audio.
+  void setEq({List<EqBand>? bands, bool? enabled, String? presetId}) {
+    if (bands != null) eqBands = bands;
+    if (enabled != null) eqEnabled = enabled;
+    if (presetId != null) eqPresetId = presetId;
+    settings
+      ..eqBands = eqBands
+      ..eqEnabled = eqEnabled
+      ..eqPresetId = eqPresetId;
+    notifyListeners();
+    _eqDebounce?.cancel();
+    _eqDebounce = Timer(
+      const Duration(milliseconds: 120),
+      () => _prop('af', eqEnabled ? buildEqFilter(eqBands) : ''),
+    );
+  }
+
+  Future<void> setLanguages({String? audio, String? subtitle}) async {
+    if (audio != null) {
+      audioLanguages = audio.trim();
+      settings.audioLanguages = audioLanguages;
+      await _prop('alang', audioLanguages);
+    }
+    if (subtitle != null) {
+      subtitleLanguages = subtitle.trim();
+      settings.subtitleLanguages = subtitleLanguages;
+      await _prop('slang', subtitleLanguages);
+    }
+    notifyListeners();
+  }
+
+  // ---- Playback -----------------------------------------------------------
+
+  Future<void> setReverse(bool on) async {
+    reverse = on;
+    notifyListeners();
+    await _prop('play-dir', on ? 'backward' : 'forward');
+    notify(on ? 'Reverse playback' : 'Forward playback');
+  }
+
+  void setOverlay({bool? waveform, bool? subtitleTimeline}) {
+    if (waveform != null) showWaveform = waveform;
+    if (subtitleTimeline != null) showSubtitleTimeline = subtitleTimeline;
+    notifyListeners();
+  }
+
+  String? _keepOpenBefore;
+
+  /// [d] null cancels; [atEndOfFile] pauses when the current file ends.
+  Future<void> setSleepTimer(Duration? d, {bool atEndOfFile = false}) async {
+    _sleepTimer?.cancel();
+    sleepAt = null;
+    if (sleepAtEnd && !atEndOfFile) await _restoreKeepOpen();
+    sleepAtEnd = atEndOfFile;
+    if (atEndOfFile) {
+      _keepOpenBefore ??= await _get('keep-open');
+      await _prop('keep-open', 'always'); // stop instead of advancing
+      notify('Sleep at end of file');
+    } else if (d != null) {
+      sleepAt = DateTime.now().add(d);
+      _sleepTimer = Timer(d, _finishSleep);
+      notify('Sleep in ${d.inMinutes} min');
+    } else {
+      notify('Sleep timer off');
+    }
+    notifyListeners();
+  }
+
+  Duration? get sleepRemaining => sleepAt?.difference(DateTime.now());
+
+  Future<void> _restoreKeepOpen() async {
+    if (_keepOpenBefore != null) {
+      await _prop('keep-open', _keepOpenBefore!);
+      _keepOpenBefore = null;
+    }
+  }
+
+  Future<void> _finishSleep() async {
+    _sleepTimer?.cancel();
+    sleepAt = null;
+    sleepAtEnd = false;
+    await _restoreKeepOpen();
+    await player.pause();
+    notify('Sleep timer: paused');
+    notifyListeners();
+  }
+
+  /// Technical details of the current file, grouped for display.
+  Future<Map<String, Map<String, String>>> metadata() async {
+    String same(String v) => v;
+    Future<Map<String, String>> read(
+      List<(String, String, String Function(String))> props,
+    ) async {
+      final out = <String, String>{};
+      for (final (label, prop, fmt) in props) {
+        final v = stripNull(await _get(prop));
+        if (v.isNotEmpty) out[label] = fmt(v);
+      }
+      return out;
+    }
+
+    final file = await read([
+      ('Name', 'filename', same),
+      ('Path', 'path', same),
+      ('Container', 'file-format', same),
+      ('Size', 'file-size', formatBytes),
+      ('Duration', 'duration', formatSeconds),
+    ]);
+    final video = await read([
+      ('Codec', 'video-format', same),
+      ('Decoder', 'video-codec', same),
+      ('Resolution', 'video-params/w', same),
+      ('Frame rate', 'container-fps', (v) => '${trimNumber(v)} fps'),
+      ('Pixel format', 'video-params/hw-pixelformat', same),
+      ('Colour matrix', 'video-params/colormatrix', same),
+      ('Primaries', 'video-params/primaries', same),
+      ('Transfer', 'video-params/gamma', same),
+      ('Bitrate', 'video-bitrate', formatBitrate),
+      ('Hardware decoding', 'hwdec-current', same),
+    ]);
+    if (video['Decoder'] == video['Codec']) video.remove('Decoder');
+    // With hardware decoding pixelformat is just "videotoolbox"; the real
+    // format is in hw-pixelformat, which is empty for software decoding.
+    if (!video.containsKey('Pixel format')) {
+      final pf = await _get('video-params/pixelformat');
+      if (pf.isNotEmpty) video['Pixel format'] = pf;
+    }
+    if (video.containsKey('Resolution')) {
+      video['Resolution'] =
+          '${video['Resolution']}×${await _get('video-params/h')}';
+    }
+    final audio = await read([
+      ('Codec', 'audio-codec-name', same),
+      ('Sample rate', 'audio-params/samplerate', formatHz),
+      ('Channels', 'audio-params/channel-count', same),
+      ('Layout', 'audio-params/channels', same),
+      ('Bitrate', 'audio-bitrate', formatBitrate),
+      ('Output device', 'audio-device', same),
+    ]);
+    final tags = parseTags(await _get('metadata'));
+    return {
+      'File': file,
+      'Video': video,
+      'Audio': audio,
+      if (tags.isNotEmpty) 'Tags': tags,
+    };
+  }
 
   /// Raises subtitles above the bottom bar (mpv units: 720-line script res).
   Future<void> liftSubtitles(bool lift) =>
@@ -195,6 +451,9 @@ class PlayerController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _sleepTimer?.cancel();
+    _eqDebounce?.cancel();
+    _completedSub?.cancel();
     _osd.close();
     player.dispose();
     super.dispose();
