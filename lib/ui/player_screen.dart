@@ -28,6 +28,12 @@ import 'queue_panel.dart';
 import 'resume_banner.dart';
 import 'subtitle_loader.dart';
 import 'subtitle_timeline.dart';
+import 'settings/settings_screen.dart';
+import 'layout/control_layout.dart';
+import 'layout/layout_editor.dart';
+import 'onboarding.dart';
+import '../player/settings_store.dart';
+import '../settings/prefs.dart';
 import 'seek_bar.dart';
 
 final bool _isMac = Platform.isMacOS;
@@ -40,12 +46,14 @@ class PlayerScreen extends StatefulWidget {
 
   /// Injectable for tests; one is created otherwise.
   final FramePreviewer? previewer;
+  final SettingsStore? settings;
   const PlayerScreen({
     super.key,
     this.initialFiles = const [],
     this.controller,
     this.library,
     this.previewer,
+    this.settings,
   });
 
   @override
@@ -57,6 +65,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       widget.controller ??
       PlayerController(
         library: widget.library,
+        settings: widget.settings,
         waveforms: WaveformService(
           Directory(
             '${widget.library?.dir.path ?? Directory.systemTemp.path}/waveforms',
@@ -65,9 +74,32 @@ class _PlayerScreenState extends State<PlayerScreen> {
       );
   late final _previewer = widget.previewer ?? FramePreviewer();
 
+  SettingsStore get _s => c.settings;
+  bool _settingsOpen = false;
+  bool _layoutEditorOpen = false;
+  String _settingsPanel = 'General';
+  bool _onTop = false;
+
+  void _openSettings([String panel = 'General']) => setState(() {
+    _settingsOpen = true;
+    _settingsPanel = panel;
+    _libraryOpen = _queueOpen = _inspectorOpen = false;
+  });
+
+  /// Window-level preferences that are not mpv properties.
+  void _onPrefs() {
+    final top = Prefs.stayOnTop.of(_s);
+    if (top != _onTop && !_pip) {
+      _onTop = top;
+      windowManager.setAlwaysOnTop(top);
+    }
+    if (mounted) setState(() {});
+  }
+
   Future<Uint8List?> _previewAt(Duration t) async {
     final uri = c.currentUri;
     if (uri == null || c.isAudioOnly) return null;
+    if (!Prefs.seekPreviews.of(_s)) return null;
     return _previewer.frameAt(uri, p.state.duration, t);
   }
 
@@ -107,6 +139,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   static const _topZone = 90.0;
   double get _bottomZone => c.showSubtitleTimeline ? 240 : 150;
   bool _nearTop = false, _nearBottom = false, _pointerIdle = false;
+  bool _lastTop = false, _lastBottom = false;
   Timer? _idleTimer;
 
   bool _queueOpen = false;
@@ -155,6 +188,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     _subs.add(p.stream.playlist.listen((_) => windowManager.setTitle(c.title)));
     c.addListener(() => mounted ? setState(() {}) : null);
+    _s.addListener(_onPrefs);
+    _onPrefs();
     c.init().then((_) {
       if (widget.initialFiles.isNotEmpty) c.openAll(widget.initialFiles);
     });
@@ -166,6 +201,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       s.cancel();
     }
     _idleTimer?.cancel();
+    _hideTimer?.cancel();
+    _s.removeListener(_onPrefs);
     c.dispose();
     _previewer.dispose();
     _focus.dispose();
@@ -184,16 +221,37 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _hasMedia &&
       (!p.state.playing || _nearBottom || c.isAudioOnly);
 
+  Timer? _hideTimer;
+
   void _onHover(PointerHoverEvent e, double height) {
     final y = e.localPosition.dy;
     final top = y < _topZone, bottom = y > height - _bottomZone;
-    if (top != _nearTop || bottom != _nearBottom || _pointerIdle) {
+    final leaving = (_nearTop && !top) || (_nearBottom && !bottom);
+    final delay = Prefs.hideDelayMs.of(_s);
+    if (leaving && delay > 0) {
+      // Keep the bars a moment after the pointer leaves an edge.
+      _hideTimer ??= Timer(Duration(milliseconds: delay), () {
+        _hideTimer = null;
+        if (mounted) {
+          setState(() {
+            _nearTop = _lastTop;
+            _nearBottom = _lastBottom;
+          });
+        }
+      });
+      _lastTop = top;
+      _lastBottom = bottom;
+    } else if (top != _nearTop || bottom != _nearBottom || _pointerIdle) {
+      _hideTimer?.cancel();
+      _hideTimer = null;
       setState(() {
         _nearTop = top;
         _nearBottom = bottom;
         _pointerIdle = false;
       });
     }
+    _lastTop = top;
+    _lastBottom = bottom;
     _idleTimer?.cancel();
     _idleTimer = Timer(const Duration(seconds: 2), () {
       if (mounted && p.state.playing && !top && !bottom) {
@@ -239,6 +297,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
     setState(() {});
   }
 
+  /// After overlays close (settings, library, editor, tour) give keyboard
+  /// focus back to the player so shortcuts work again. Never steals focus
+  /// from a dialog on top or from a text field being typed in.
+  void _reclaimFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _focus.hasFocus) return;
+      if (_settingsOpen || _layoutEditorOpen || _libraryOpen) return;
+      if (ModalRoute.of(context)?.isCurrent == false) return;
+      final f = FocusManager.instance.primaryFocus?.context;
+      if (f != null &&
+          (f.widget is EditableText ||
+              f.findAncestorWidgetOfExactType<EditableText>() != null)) {
+        return;
+      }
+      _focus.requestFocus();
+    });
+  }
+
   // ---- Keyboard ---------------------------------------------------------
 
   KeyEventResult _onKey(FocusNode node, KeyEvent e) {
@@ -276,6 +352,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
         }
       } else if (k == LogicalKeyboardKey.keyI) {
         _toggleInspector();
+      } else if (k == LogicalKeyboardKey.comma) {
+        _settingsOpen ? setState(() => _settingsOpen = false) : _openSettings();
       } else if (k == LogicalKeyboardKey.keyW && _hasMedia) {
         c.closeMedia(combo('W'));
       } else {
@@ -289,6 +367,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
       k == LogicalKeyboardKey.enter ? c.acceptResume() : c.dismissResume();
       return KeyEventResult.handled;
     }
+    if (!Prefs.onboarded.of(_s)) {
+      if (k == LogicalKeyboardKey.escape) Prefs.onboarded.set(_s, true);
+      return KeyEventResult.ignored;
+    }
+    if (_settingsOpen && k == LogicalKeyboardKey.escape) {
+      setState(() => _settingsOpen = false);
+      return KeyEventResult.handled;
+    }
+    if (_settingsOpen) return KeyEventResult.ignored;
     if (_libraryOpen && k == LogicalKeyboardKey.escape) {
       setState(() => _libraryOpen = false);
       return KeyEventResult.handled;
@@ -298,9 +385,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (k == LogicalKeyboardKey.space || k == LogicalKeyboardKey.keyK) {
       c.togglePlay(k == LogicalKeyboardKey.space ? 'Space' : 'K');
     } else if (k == LogicalKeyboardKey.arrowRight) {
-      c.seekBy(Duration(seconds: shift ? 60 : 5), combo('→'));
+      c.seekBy(
+        Duration(
+          seconds: shift ? Prefs.bigSeekStep.of(_s) : Prefs.seekStep.of(_s),
+        ),
+        combo('→'),
+      );
     } else if (k == LogicalKeyboardKey.arrowLeft) {
-      c.seekBy(Duration(seconds: shift ? -60 : -5), combo('←'));
+      c.seekBy(
+        Duration(
+          seconds: -(shift ? Prefs.bigSeekStep.of(_s) : Prefs.seekStep.of(_s)),
+        ),
+        combo('←'),
+      );
     } else if (k == LogicalKeyboardKey.period) {
       c.frameStep(true, '.');
     } else if (k == LogicalKeyboardKey.comma) {
@@ -335,6 +432,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       c.setRate(1.0, 'Backspace');
     } else if (k == LogicalKeyboardKey.keyH) {
       c.toggleUi('H');
+    } else if (k == LogicalKeyboardKey.keyS && _hasMedia) {
+      c.takeScreenshot('S');
     } else if (k == LogicalKeyboardKey.keyR) {
       c.rotate('R');
     } else if (k == LogicalKeyboardKey.keyZ) {
@@ -371,6 +470,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _doubleTap(TapDownDetails d, double width) {
     final x = d.localPosition.dx;
+    switch (Prefs.doubleClick.of(_s)) {
+      case 'fullscreen':
+        _toggleFullscreen('Double-click');
+        return;
+      case 'play':
+        c.togglePlay('Double-click');
+        return;
+    }
     if (x < width / 3) {
       c.seekBy(const Duration(seconds: -10), 'Double-tap');
     } else if (x > width * 2 / 3) {
@@ -384,6 +491,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _reclaimFocus();
     // Keep subtitles clear of the bottom bar while it is shown. mpv's
     // margin is in 720-line units, so convert from this window's pixels.
     final barPx = !(_showBottom && _hasMedia)
@@ -543,11 +651,53 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           ),
                         ),
                       ),
+                    if (!Prefs.onboarded.of(_s))
+                      Positioned.fill(
+                        child: OnboardingWizard(
+                          settings: _s,
+                          onOpenFile: loader.openFiles,
+                        ),
+                      ),
+                    if (_layoutEditorOpen)
+                      Positioned.fill(
+                        child: LayoutEditor(
+                          profiles: _layouts,
+                          onClose: () =>
+                              setState(() => _layoutEditorOpen = false),
+                        ),
+                      ),
+                    if (_settingsOpen)
+                      Positioned.fill(
+                        child: SettingsScreen(
+                          controller: c,
+                          initialPanel: _settingsPanel,
+                          onClose: () => setState(() => _settingsOpen = false),
+                          onShowOnboarding: () => setState(() {
+                            _settingsOpen = false;
+                            Prefs.onboarded.set(_s, false);
+                          }),
+                          onEditLayout: () => setState(() {
+                            _settingsOpen = false;
+                            _layoutEditorOpen = true;
+                          }),
+                          onEditSubtitleStyle: () => setState(() {
+                            _settingsOpen = false;
+                            _inspectorOpen = true;
+                            _inspectorTab = InspectorTab.subtitles;
+                          }),
+                        ),
+                      ),
                     Positioned(
                       top: 70,
                       left: 0,
                       right: 0,
-                      child: Center(child: Osd(messages: c.osd)),
+                      child: Center(
+                        child: Osd(
+                          messages: c.osd,
+                          enabled: Prefs.osd.of(_s),
+                          durationMs: Prefs.osdMs.of(_s),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -575,7 +725,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
       child: Listener(
         onPointerSignal: (e) {
           if (e is PointerScrollEvent) {
-            c.setVolume(p.state.volume - e.scrollDelta.dy.sign * 5, 'Scroll');
+            switch (Prefs.wheel.of(_s)) {
+              case 'volume':
+                c.setVolume(
+                  p.state.volume - e.scrollDelta.dy.sign * 5,
+                  'Scroll',
+                );
+              case 'seek':
+                c.seekBy(
+                  Duration(seconds: e.scrollDelta.dy > 0 ? -5 : 5),
+                  'Scroll',
+                );
+            }
           }
         },
         // Trackpad: two-finger vertical swipe & pinch.
@@ -632,6 +793,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   child: Video(
                     controller: c.video,
                     controls: NoVideoControls,
+                    // Subtitles are rendered by mpv (libass), not this overlay.
+                    subtitleViewConfiguration: const SubtitleViewConfiguration(
+                      visible: false,
+                    ),
                     fill: Colors.black,
                   ),
                 ),
@@ -652,7 +817,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       selected: c.uiHidden,
       onTap: () => c.toggleUi(),
     ),
-    const Divider(height: 10, color: ConeColors.border),
+    Divider(height: 10, color: ConeColors.border),
     const FlyoutHeader('Video'),
     FlyoutItem(label: 'Rotate 90°', detail: 'R', onTap: () => c.rotate()),
     FlyoutItem(
@@ -680,7 +845,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         c.notify('Zoom 100%');
       },
     ),
-    const Divider(height: 10, color: ConeColors.border),
+    Divider(height: 10, color: ConeColors.border),
     FlyoutItem(
       label: 'Add bookmark',
       detail: '$_mod+B',
@@ -741,7 +906,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   icon: Icons.close,
                   onTap: () => c.closeMedia(),
                 ),
-              const Divider(height: 10, color: ConeColors.border),
+              Divider(height: 10, color: ConeColors.border),
               FlyoutItem(
                 label: 'Subtitles…',
                 detail: 'File · Folder · Online',
@@ -755,6 +920,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   icon: Icons.video_library_outlined,
                   onTap: _openLibrary,
                 ),
+              FlyoutItem(
+                label: 'Settings',
+                detail: '$_mod+,',
+                icon: Icons.settings_outlined,
+                onTap: () => _openSettings(),
+              ),
               FlyoutItem(
                 label: 'Inspector',
                 detail: '$_mod+I',
@@ -807,6 +978,199 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
+  late final _layouts = LayoutProfiles(_s);
+
+  void _cycleRepeat() {
+    const order = ['off', 'all', 'one'];
+    final next = order[(order.indexOf(Prefs.repeat.of(_s)) + 1) % order.length];
+    Prefs.repeat.set(_s, next);
+    c.notify(switch (next) {
+      'one' => 'Repeat this file',
+      'all' => 'Repeat queue',
+      _ => 'Repeat off',
+    });
+  }
+
+  /// Widgets for one control-bar button (see the layout customizer).
+  List<Widget> _control(ControlId id) => switch (id) {
+    ControlId.prev => [
+      ControlIcon(
+        icon: Icons.skip_previous_rounded,
+        tooltip: 'Previous (P)',
+        onPressed: c.previous,
+      ),
+    ],
+    ControlId.play => [
+      ControlIcon(
+        icon: p.state.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+        tooltip: p.state.playing ? 'Pause (Space)' : 'Play (Space)',
+        size: 30,
+        onPressed: c.togglePlay,
+      ),
+    ],
+    ControlId.next => [
+      ControlIcon(
+        icon: Icons.skip_next_rounded,
+        tooltip: 'Next (N)',
+        onPressed: c.next,
+      ),
+    ],
+    ControlId.frameBack => [
+      ControlIcon(
+        icon: Icons.chevron_left,
+        tooltip: 'Previous frame (,)',
+        onPressed: () => c.frameStep(false),
+      ),
+    ],
+    ControlId.frameForward => [
+      ControlIcon(
+        icon: Icons.chevron_right,
+        tooltip: 'Next frame (.)',
+        onPressed: () => c.frameStep(true),
+      ),
+    ],
+    ControlId.time => [
+      const SizedBox(width: 10),
+      StreamBuilder<Duration>(
+        stream: p.stream.position,
+        builder: (_, _) => Text(
+          '${formatDuration(p.state.position)} / ${formatDuration(p.state.duration)}',
+          style: const TextStyle(
+            color: ConeColors.textMuted,
+            fontSize: 12,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
+        ),
+      ),
+      if (p.state.rate != 1.0) ...[
+        const SizedBox(width: 10),
+        Text(
+          '${p.state.rate}x',
+          style: TextStyle(color: ConeColors.accent, fontSize: 12),
+        ),
+      ],
+      const SizedBox(width: 6),
+    ],
+    ControlId.speed => [
+      TrackedMenuAnchor(
+        menuChildren: [
+          for (final r in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0])
+            FlyoutItem(
+              label: '$r×',
+              selected: (p.state.rate - r).abs() < 0.01,
+              onTap: () => c.setRate(r),
+            ),
+        ],
+        builder: (context, ctrl, _) => ControlIcon(
+          icon: Icons.speed,
+          tooltip: 'Speed',
+          active: p.state.rate != 1.0,
+          onPressed: () => ctrl.isOpen ? ctrl.close() : ctrl.open(),
+        ),
+      ),
+    ],
+    ControlId.bookmark => [
+      ControlIcon(
+        icon: Icons.bookmark_add_outlined,
+        tooltip: 'Bookmark ($_mod+B)',
+        onPressed: () => c.addBookmark(),
+      ),
+    ],
+    ControlId.screenshot => [
+      ControlIcon(
+        icon: Icons.photo_camera_outlined,
+        tooltip: 'Screenshot (S)',
+        onPressed: () => c.takeScreenshot(),
+      ),
+    ],
+    ControlId.rotate => [
+      ControlIcon(
+        icon: Icons.rotate_90_degrees_cw_outlined,
+        tooltip: 'Rotate (R)',
+        onPressed: () => c.rotate(),
+      ),
+    ],
+    ControlId.repeat => [
+      ControlIcon(
+        icon: switch (Prefs.repeat.of(_s)) {
+          'one' => Icons.repeat_one,
+          _ => Icons.repeat,
+        },
+        tooltip: 'Repeat',
+        active: Prefs.repeat.of(_s) != 'off',
+        onPressed: _cycleRepeat,
+      ),
+    ],
+    ControlId.fullscreen => [
+      ControlIcon(
+        icon: _fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+        tooltip: 'Fullscreen (F)',
+        onPressed: _toggleFullscreen,
+      ),
+    ],
+    ControlId.pip => [
+      ControlIcon(
+        icon: Icons.picture_in_picture_alt_outlined,
+        tooltip: 'Picture-in-picture (I)',
+        active: _pip,
+        onPressed: _togglePip,
+      ),
+    ],
+    ControlId.queue => [
+      ControlIcon(
+        icon: Icons.queue_music,
+        tooltip: 'Queue ($_mod+L)',
+        active: _queueOpen,
+        onPressed: () => _toggleQueue(),
+      ),
+    ],
+    ControlId.subtitles => [
+      FlyoutButton(
+        icon: Icons.subtitles_outlined,
+        tooltip: 'Subtitles',
+        active:
+            p.state.track.subtitle.id != 'no' &&
+            p.state.track.subtitle.id != 'auto',
+        builder: () => subtitleFlyout(
+          player: p,
+          onLoadFile: loader.openSubtitle,
+          onFind: () => showSubtitleLoader(context, c),
+        ),
+      ),
+    ],
+    ControlId.audio => [
+      FlyoutButton(
+        icon: Icons.graphic_eq,
+        tooltip: 'Audio tracks & output',
+        builder: () => audioFlyout(player: p),
+      ),
+    ],
+    ControlId.inspector => [
+      ControlIcon(
+        icon: Icons.tune,
+        tooltip: 'Inspector ($_mod+I)',
+        active: _inspectorOpen,
+        onPressed: _toggleInspector,
+      ),
+    ],
+    ControlId.library => [
+      if (_lib != null)
+        ControlIcon(
+          icon: Icons.video_library_outlined,
+          tooltip: 'Library ($_mod+Shift+L)',
+          onPressed: _openLibrary,
+        ),
+    ],
+    ControlId.volume => [
+      const SizedBox(width: 6),
+      ConeVolume(
+        volume: p.state.volume,
+        onChanged: (v) => c.setVolume(v),
+        onToggleMute: () => c.toggleMute(),
+      ),
+    ],
+  };
+
   Widget _bottomBar(double width) {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 28, 12, 6),
@@ -822,87 +1186,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
         children: [
           Row(
             children: [
-              ControlIcon(
-                icon: Icons.skip_previous_rounded,
-                tooltip: 'Previous (P)',
-                onPressed: c.previous,
-              ),
-              ControlIcon(
-                icon: p.state.playing
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
-                tooltip: p.state.playing ? 'Pause (Space)' : 'Play (Space)',
-                size: 30,
-                onPressed: c.togglePlay,
-              ),
-              ControlIcon(
-                icon: Icons.skip_next_rounded,
-                tooltip: 'Next (N)',
-                onPressed: c.next,
-              ),
-              const SizedBox(width: 10),
-              StreamBuilder<Duration>(
-                stream: p.stream.position,
-                builder: (_, _) => Text(
-                  '${formatDuration(p.state.position)} / ${formatDuration(p.state.duration)}',
-                  style: const TextStyle(
-                    color: ConeColors.textMuted,
-                    fontSize: 12,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-              if (p.state.rate != 1.0) ...[
-                const SizedBox(width: 10),
-                Text(
-                  '${p.state.rate}x',
-                  style: const TextStyle(
-                    color: ConeColors.accent,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+              for (final id in _layouts.active.left) ..._control(id),
               const Spacer(),
-              ControlIcon(
-                icon: _fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-                tooltip: 'Fullscreen (F)',
-                onPressed: _toggleFullscreen,
-              ),
-              ControlIcon(
-                icon: Icons.picture_in_picture_alt_outlined,
-                tooltip: 'Picture-in-picture (I)',
-                active: _pip,
-                onPressed: _togglePip,
-              ),
-              ControlIcon(
-                icon: Icons.queue_music,
-                tooltip: 'Queue ($_mod+L)',
-                active: _queueOpen,
-                onPressed: () => _toggleQueue(),
-              ),
-              FlyoutButton(
-                icon: Icons.subtitles_outlined,
-                tooltip: 'Subtitles',
-                active:
-                    p.state.track.subtitle.id != 'no' &&
-                    p.state.track.subtitle.id != 'auto',
-                builder: () => subtitleFlyout(
-                  player: p,
-                  onLoadFile: loader.openSubtitle,
-                  onFind: () => showSubtitleLoader(context, c),
-                ),
-              ),
-              FlyoutButton(
-                icon: Icons.graphic_eq,
-                tooltip: 'Audio tracks & output',
-                builder: () => audioFlyout(player: p),
-              ),
-              const SizedBox(width: 6),
-              ConeVolume(
-                volume: p.state.volume,
-                onChanged: (v) => c.setVolume(v),
-                onToggleMute: () => c.toggleMute(),
-              ),
+              for (final id in _layouts.active.right) ..._control(id),
               const SizedBox(width: 4),
             ],
           ),
@@ -952,11 +1238,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(
-          Icons.change_history_rounded,
-          size: 72,
-          color: ConeColors.accent,
-        ),
+        Icon(Icons.change_history_rounded, size: 72, color: ConeColors.accent),
         const SizedBox(height: 14),
         const Text(
           'Drop media here',
@@ -992,7 +1274,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               label: const Text('Network stream'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: ConeColors.text,
-                side: const BorderSide(color: ConeColors.border),
+                side: BorderSide(color: ConeColors.border),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(ConeRadius.md),
                 ),
@@ -1015,7 +1297,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       alignment: Alignment.center,
       child: Text(
         _hasMedia ? 'Drop to add to queue' : 'Drop to play',
-        style: const TextStyle(
+        style: TextStyle(
           color: ConeColors.accent,
           fontSize: 18,
           fontWeight: FontWeight.w600,

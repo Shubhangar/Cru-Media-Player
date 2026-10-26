@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:cone_player/library/library_store.dart';
 import 'package:cone_player/player/player_controller.dart';
 import 'package:cone_player/player/settings_store.dart';
+import 'package:cone_player/settings/prefs.dart';
 import 'package:cone_player/theme.dart';
 import 'package:cone_player/ui/home/home_view.dart';
 import 'package:cone_player/ui/library/library_screen.dart';
@@ -46,6 +47,7 @@ void main() {
       settings: SettingsStore(prefix: testPrefix),
       library: lib,
     );
+    Prefs.onboarded.set(c.settings, true);
     final p = c.player;
     final clip = '$fixtures/test-clip.mp4';
     final song = '$fixtures/test-song.m4a';

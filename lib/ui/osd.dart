@@ -8,7 +8,14 @@ import '../theme.dart';
 /// On-screen display: shows the executed action and the key that did it.
 class Osd extends StatefulWidget {
   final Stream<OsdMessage> messages;
-  const Osd({super.key, required this.messages});
+  final bool enabled;
+  final int durationMs;
+  const Osd({
+    super.key,
+    required this.messages,
+    this.enabled = true,
+    this.durationMs = 1300,
+  });
 
   @override
   State<Osd> createState() => _OsdState();
@@ -24,13 +31,14 @@ class _OsdState extends State<Osd> {
   void initState() {
     super.initState();
     _sub = widget.messages.listen((m) {
+      if (!widget.enabled) return;
       _timer?.cancel();
       setState(() {
         _msg = m;
         _visible = true;
       });
       _timer = Timer(
-        const Duration(milliseconds: 1300),
+        Duration(milliseconds: widget.durationMs),
         () => mounted ? setState(() => _visible = false) : null,
       );
     });
@@ -105,7 +113,7 @@ class KeyChip extends StatelessWidget {
     ),
     child: Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         color: ConeColors.accent,
         fontSize: 12,
         fontFamily: 'monospace',

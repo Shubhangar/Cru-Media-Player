@@ -45,17 +45,25 @@ const eqPresets = <EqPreset>[
   EqPreset('rock', 'Rock', [4, 3, 2, 0, -1, -1, 1, 2, 3, 4]),
 ];
 
+/// A very wide (Q 0.01, ~13 octaves) peaking band centred at 1 kHz acts as
+/// a near-flat gain across the audible range. Used as the anti-clipping
+/// pre-gain because the bundled ffmpeg has no `volume` filter.
+EqBand preGainBand(double db) => EqBand(1000, db, 0.01);
+
 /// Builds the mpv `af` value for the bands (empty string = no filter).
 /// Adds a negative pre-gain equal to the biggest boost to avoid clipping.
+/// Only `equalizer` is available in the bundled ffmpeg, so everything is
+/// expressed with it (named options only; positional ones fail to parse).
 String buildEqFilter(List<EqBand> bands) {
   final active = bands.where((b) => b.gain.abs() >= 0.05).toList();
   if (active.isEmpty) return '';
   final peak = eqResponsePeak(bands);
-  final parts = [
-    if (peak > 0) 'volume=${(-peak).toStringAsFixed(1)}dB',
-    for (final b in active)
+  String eq(EqBand b) =>
       'equalizer=f=${b.freq.round()}:t=q:w=${b.q.toStringAsFixed(2)}'
-          ':g=${b.gain.toStringAsFixed(1)}',
+      ':g=${b.gain.toStringAsFixed(1)}';
+  final parts = [
+    if (peak > 0) eq(preGainBand(-peak)),
+    for (final b in active) eq(b),
   ];
   return 'lavfi=[${parts.join(',')}]';
 }

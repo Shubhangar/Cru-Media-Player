@@ -343,7 +343,7 @@ class _ParametricEqState extends State<ParametricEq> {
             children: [
               Text(
                 'Band ${_sel + 1}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   color: ConeColors.accent,
                   fontWeight: FontWeight.w600,

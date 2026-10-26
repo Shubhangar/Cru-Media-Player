@@ -45,7 +45,7 @@ class FlyoutItem extends StatelessWidget {
     leadingIcon: SizedBox(
       width: 20,
       child: selected
-          ? const Icon(Icons.check, size: 18, color: ConeColors.accent)
+          ? Icon(Icons.check, size: 18, color: ConeColors.accent)
           : (icon != null
                 ? Icon(icon, size: 18, color: ConeColors.textMuted)
                 : null),
@@ -71,8 +71,8 @@ class FlyoutItem extends StatelessWidget {
 }
 
 final menuStyle = MenuStyle(
-  backgroundColor: const WidgetStatePropertyAll(ConeColors.surface),
-  side: const WidgetStatePropertyAll(BorderSide(color: ConeColors.border)),
+  backgroundColor: WidgetStatePropertyAll(ConeColors.surface),
+  side: WidgetStatePropertyAll(BorderSide(color: ConeColors.border)),
   shape: WidgetStatePropertyAll(
     RoundedRectangleBorder(borderRadius: BorderRadius.circular(ConeRadius.lg)),
   ),
@@ -187,7 +187,7 @@ class ControlIcon extends StatelessWidget {
     message: tooltip,
     child: IconButton(
       onPressed: onPressed,
-      iconSize: size,
+      iconSize: size * ConeDensity.scale,
       color: active ? ConeColors.accent : ConeColors.text,
       hoverColor: ConeColors.surfaceHigh,
       style: IconButton.styleFrom(
@@ -228,7 +228,7 @@ List<Widget> subtitleFlyout({
         selected: t.id == current.id,
         onTap: () => player.setSubtitleTrack(t),
       ),
-    const Divider(height: 10, color: ConeColors.border),
+    Divider(height: 10, color: ConeColors.border),
     FlyoutItem(
       label: 'Load subtitle file…',
       icon: Icons.file_open_outlined,
@@ -265,7 +265,7 @@ List<Widget> audioFlyout({required Player player}) {
         selected: t.id == current.id,
         onTap: () => player.setAudioTrack(t),
       ),
-    const Divider(height: 10, color: ConeColors.border),
+    Divider(height: 10, color: ConeColors.border),
     const FlyoutHeader('Output device'),
     for (final d in devices)
       FlyoutItem(

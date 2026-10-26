@@ -41,7 +41,7 @@ class QueuePanel extends StatelessWidget {
             color: ConeColors.surface.withValues(alpha: 0.96),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(ConeRadius.lg),
-              side: const BorderSide(color: ConeColors.border),
+              side: BorderSide(color: ConeColors.border),
             ),
             clipBehavior: Clip.antiAlias,
             child: DefaultTabController(
@@ -141,7 +141,7 @@ class _QueueList extends StatelessWidget {
                             child: ListTile(
                               dense: true,
                               leading: current
-                                  ? const Icon(
+                                  ? Icon(
                                       Icons.play_arrow_rounded,
                                       color: ConeColors.accent,
                                     )
@@ -175,7 +175,7 @@ class _QueueList extends StatelessWidget {
                         },
                       ),
               ),
-              const Divider(height: 1, color: ConeColors.border),
+              Divider(height: 1, color: ConeColors.border),
               TextButton.icon(
                 onPressed: onAddFiles,
                 icon: const Icon(Icons.add, size: 18),
@@ -209,7 +209,7 @@ class _BookmarkList extends StatelessWidget {
       itemCount: b.length,
       itemBuilder: (_, i) => ListTile(
         dense: true,
-        leading: const Icon(Icons.bookmark, color: ConeColors.accent, size: 18),
+        leading: Icon(Icons.bookmark, color: ConeColors.accent, size: 18),
         title: Text(b[i].label, style: const TextStyle(color: ConeColors.text)),
         trailing: Text(
           formatDuration(b[i].position),
@@ -249,7 +249,7 @@ class QueueDropTarget extends StatelessWidget {
                   borderRadius: BorderRadius.circular(ConeRadius.md),
                 ),
                 alignment: Alignment.center,
-                child: const Text(
+                child: Text(
                   'Drop to add to queue',
                   style: TextStyle(
                     color: ConeColors.accent,
@@ -349,7 +349,7 @@ class _LibraryTabState extends State<_LibraryTab> {
           child: Container(
             height: 52,
             width: double.infinity,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(top: BorderSide(color: ConeColors.border)),
             ),
             alignment: Alignment.center,
@@ -410,7 +410,7 @@ class _LibraryTabState extends State<_LibraryTab> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.queue, size: 16, color: ConeColors.accent),
+              Icon(Icons.queue, size: 16, color: ConeColors.accent),
               const SizedBox(width: 8),
               Text(
                 displayName(uri),

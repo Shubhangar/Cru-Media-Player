@@ -4,8 +4,10 @@ import 'dart:ui' as ui;
 
 import 'package:cone_player/library/library_store.dart';
 import 'package:cone_player/player/frame_previewer.dart';
+import 'package:cone_player/player/models.dart';
 import 'package:cone_player/player/player_controller.dart';
 import 'package:cone_player/player/settings_store.dart';
+import 'package:cone_player/settings/prefs.dart';
 import 'package:cone_player/player/waveform.dart';
 import 'package:cone_player/theme.dart';
 import 'package:cone_player/ui/music_view.dart';
@@ -45,6 +47,7 @@ void main() {
       library: lib,
       waveforms: WaveformService(Directory('${tmp.path}/waves')),
     );
+    Prefs.onboarded.set(c.settings, true);
     final p = c.player;
     final previewer = FramePreviewer();
     await tester.binding.setSurfaceSize(const Size(1280, 760));
@@ -171,6 +174,27 @@ void main() {
     await settle(tester);
     expect(c.subDelay, 0);
     c.setOverlay(subtitleTimeline: false);
+
+    // --- Subtitle style is what is actually drawn (mpv/libass) -------------
+    bool yellow(int r, int g, int b) => r > 200 && g > 170 && b < 130;
+    await p.seek(const Duration(seconds: 2)); // "Hello from Cone Player"
+    await settle(tester, 700);
+    final whiteBaseline = await countPixels(tester, yellow);
+    await c.setSubStyle(
+      builtInSubtitleStyles.firstWhere((s) => s.name == 'Cinema yellow').style,
+    );
+    await p.seek(const Duration(seconds: 2, milliseconds: 100));
+    await settle(tester, 700);
+    final yellowPixels = await countPixels(tester, yellow);
+    expect(
+      yellowPixels,
+      greaterThan(whiteBaseline + 300),
+      reason:
+          'yellow subtitle text must be rendered '
+          '(baseline $whiteBaseline, now $yellowPixels)',
+    );
+    await snap(tester, 'p4-7-yellow-subs');
+    await c.setSubStyle(builtInSubtitleStyles.first.style);
 
     // --- Music: tall waveform scrubber -------------------------------------
     c.setOverlay(waveform: false);

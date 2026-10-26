@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
@@ -8,7 +9,9 @@ import '../library/library_store.dart';
 import 'eq.dart';
 import 'format.dart';
 import 'models.dart';
+import '../settings/prefs.dart';
 import 'settings_store.dart';
+import 'shaders.dart';
 import 'subtitles.dart';
 import 'waveform.dart';
 
@@ -61,7 +64,14 @@ class PlayerController extends ChangeNotifier {
   /// History, playlists and sources. Null in contexts without a library.
   final LibraryStore? library;
   final Player player = Player(
-    configuration: const PlayerConfiguration(title: 'Cone Player'),
+    // Warnings are needed to notice filters mpv silently drops.
+    // libass: mpv draws subtitles into the video, so the Subtitles tab's
+    // style (font, colours, outline, position, margin) is what you see.
+    configuration: const PlayerConfiguration(
+      title: 'Cone Player',
+      logLevel: MPVLogLevel.warn,
+      libass: true,
+    ),
   );
   late final VideoController video = VideoController(player);
 
@@ -284,8 +294,84 @@ class PlayerController extends ChangeNotifier {
   }
 
   /// Restores saved preferences and pushes them to mpv. Call once.
+  /// Built-in + user GLSL shaders; null until [init] has run.
+  ShaderLibrary? shaders;
+
+  /// Last audio/video filter mpv refused (shown to the user), if any.
+  String? filterError;
+  StreamSubscription? _logSub;
+  Map<String, String> _appliedPrefs = {};
+
+  /// mpv properties derived from preferences.
+  Map<String, String> prefsToMpv() {
+    final s = settings;
+    final shaders = Prefs.activeShaders
+        .of(s)
+        .split(';')
+        .where((p) => p.isNotEmpty)
+        .join(Platform.isWindows ? ';' : ':');
+    final ua = Prefs.userAgent.of(s);
+    return {
+      'hwdec': Prefs.hwdec.of(s) ? 'auto-safe' : 'no',
+      'deband': Prefs.deband.of(s) ? 'yes' : 'no',
+      'volume-max': Prefs.volumeBoost.of(s) ? '150' : '100',
+      'audio-normalize-downmix': Prefs.normalize.of(s) ? 'yes' : 'no',
+      'sid': Prefs.subMode.of(s) == 'off' ? 'no' : 'auto',
+      'subs-with-matching-audio': switch (Prefs.subMode.of(s)) {
+        'foreign' => 'no',
+        'forced' => 'forced',
+        _ => 'yes',
+      },
+      'sub-auto': Prefs.subAutoLoad.of(s),
+      'network-timeout': '${Prefs.netTimeout.of(s)}',
+      'demuxer-max-bytes': '${Prefs.cacheMb.of(s)}MiB',
+      'prefetch-playlist': Prefs.prefetch.of(s) ? 'yes' : 'no',
+      'user-agent': ua.isEmpty ? 'ConePlayer/1.0' : ua,
+      'loop-file': Prefs.repeat.of(s) == 'one' ? 'inf' : 'no',
+      'loop-playlist': Prefs.repeat.of(s) == 'all' ? 'inf' : 'no',
+      if (!sleepAtEnd) 'keep-open': Prefs.autoplayNext.of(s) ? 'yes' : 'always',
+      'glsl-shaders': shaders,
+    };
+  }
+
+  Future<void> _applyPrefs() async {
+    final next = prefsToMpv();
+    await _applyDiff(_appliedPrefs, next);
+    _appliedPrefs = next;
+  }
+
   Future<void> init() async {
     await settings.load();
+    _logSub = player.stream.log.listen((l) {
+      final t = l.text;
+      if (t.contains('filter') &&
+          (t.contains('failed') || t.contains('No such filter'))) {
+        filterError = t.trim();
+        notify('An audio/video filter is not supported');
+        notifyListeners();
+      }
+    });
+    shaders = ShaderLibrary(
+      Directory(
+        '${library?.dir.path ?? '${Directory.systemTemp.path}/cone'}/shaders',
+      ),
+      settings,
+    );
+    try {
+      await shaders!.prepare();
+    } catch (e) {
+      debugPrint('shaders: $e');
+    }
+    await _applyPrefs();
+    settings.addListener(_applyPrefs);
+    adjust = adjust.copyWith(
+      scaler: Prefs.scaler.of(settings),
+      toneMapHdr: Prefs.toneMap.of(settings),
+    );
+    await _applyDiff(const {}, adjust.toMpv(), force: true);
+    await player.setVolume(Prefs.startVolume.of(settings));
+    final speed = Prefs.defaultSpeed.of(settings);
+    if (speed != 1.0) await player.setRate(speed);
     subStyle = settings.subtitleStyle ?? subStyle;
     userSubPresets = settings.subtitlePresets;
     eqBands = settings.eqBands ?? eqBands;
@@ -357,7 +443,14 @@ class PlayerController extends ChangeNotifier {
     _lastThumb = null;
     _lastSaved = DateTime.now();
     final h = library!.history[uri];
-    resumeOffer = (h != null && h.resumable) ? h : null;
+    final mode = Prefs.resume.of(settings);
+    final offer = (h != null && h.resumable && mode != 'never') ? h : null;
+    if (offer != null && mode == 'always') {
+      resumeOffer = offer;
+      acceptResume();
+    } else {
+      resumeOffer = offer;
+    }
     notifyListeners();
   }
 
@@ -372,7 +465,10 @@ class PlayerController extends ChangeNotifier {
     final due =
         _lastThumb == null ||
         DateTime.now().difference(_lastThumb!) > const Duration(minutes: 1);
-    if (due && library!.history[uri] != null && !isAudioOnly) {
+    if (due &&
+        Prefs.saveThumbnails.of(settings) &&
+        library!.history[uri] != null &&
+        !isAudioOnly) {
       _lastThumb = DateTime.now();
       player.screenshot().then((jpeg) {
         if (jpeg != null) library!.saveThumb(uri, jpeg);
@@ -384,6 +480,7 @@ class PlayerController extends ChangeNotifier {
     final uri = _trackedUri;
     final dur = player.state.duration;
     if (library == null || uri == null || dur <= Duration.zero) return;
+    if (!Prefs.rememberHistory.of(settings)) return;
     _lastSaved = DateTime.now();
     library!.recordProgress(
       uri,
@@ -651,6 +748,38 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Saves the current frame (with subtitles) to the screenshot folder.
+  Future<String?> takeScreenshot([String? key]) async {
+    if (currentUri == null) return null;
+    final png = Prefs.shotFormat.of(settings) == 'png';
+    final bytes = await player.screenshot(
+      format: png ? 'image/png' : 'image/jpeg',
+      includeLibassSubtitles: true,
+    );
+    if (bytes == null) {
+      notify('Screenshot failed', key);
+      return null;
+    }
+    var folder = Prefs.shotFolder.of(settings);
+    if (folder.isEmpty) {
+      final home =
+          Platform.environment['HOME'] ??
+          Platform.environment['USERPROFILE'] ??
+          Directory.systemTemp.path;
+      folder =
+          '$home${Platform.pathSeparator}Pictures'
+          '${Platform.pathSeparator}Cone Player';
+    }
+    await Directory(folder).create(recursive: true);
+    final t = formatDuration(player.state.position).replaceAll(':', '-');
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final name = '${title.replaceAll(RegExp(r'[^\w\- .]'), '_')} $t $stamp';
+    final path = '$folder${Platform.pathSeparator}$name.${png ? 'png' : 'jpg'}';
+    await File(path).writeAsBytes(bytes);
+    notify('Screenshot saved', key);
+    return path;
+  }
+
   /// Title / artist / album tags of the current file.
   Future<Map<String, String>> trackTags() async =>
       parseTags(await _get('metadata'));
@@ -672,6 +801,8 @@ class PlayerController extends ChangeNotifier {
     for (final sub in [...?_historySubs, ...?_waveSubs]) {
       sub.cancel();
     }
+    settings.removeListener(_applyPrefs);
+    _logSub?.cancel();
     _sleepTimer?.cancel();
     _eqDebounce?.cancel();
     _completedSub?.cancel();

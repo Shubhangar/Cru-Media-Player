@@ -62,3 +62,32 @@ Future<void> pressMod(
   if (shift) await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
   await tester.sendKeyUpEvent(modKey);
 }
+
+/// Raw RGBA pixels of the app (including the video texture).
+Future<(ByteData, int width)> captureRgba(WidgetTester tester) async {
+  await tester.pump();
+  final boundary =
+      shotKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+  final image = await boundary.toImage(pixelRatio: 1);
+  final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+  return (data!, image.width);
+}
+
+/// Counts pixels in the lower half matching [test] (r, g, b).
+Future<int> countPixels(
+  WidgetTester tester,
+  bool Function(int r, int g, int b) test,
+) async {
+  final (data, width) = await captureRgba(tester);
+  final height = data.lengthInBytes ~/ 4 ~/ width;
+  var n = 0;
+  for (var y = height ~/ 2; y < height; y++) {
+    for (var x = 0; x < width; x++) {
+      final i = (y * width + x) * 4;
+      if (test(data.getUint8(i), data.getUint8(i + 1), data.getUint8(i + 2))) {
+        n++;
+      }
+    }
+  }
+  return n;
+}

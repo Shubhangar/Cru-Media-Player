@@ -93,14 +93,14 @@ class _PlaybackTabState extends State<PlaybackTab> {
           trailing: remaining != null
               ? Text(
                   _fmt(remaining),
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: ConeColors.accent,
                     fontSize: 13,
                     fontFeatures: [FontFeature.tabularFigures()],
                   ),
                 )
               : (c.sleepAtEnd
-                    ? const Text(
+                    ? Text(
                         'At end of file',
                         style: TextStyle(
                           color: ConeColors.accent,
@@ -238,7 +238,7 @@ class _MetaGroup extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
             color: ConeColors.accent,

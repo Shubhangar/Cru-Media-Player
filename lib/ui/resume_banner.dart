@@ -45,7 +45,7 @@ class _ResumeBannerState extends State<ResumeBanner>
       shadowColor: Colors.black,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(ConeRadius.lg),
-        side: const BorderSide(color: ConeColors.border),
+        side: BorderSide(color: ConeColors.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: SizedBox(
@@ -57,7 +57,7 @@ class _ResumeBannerState extends State<ResumeBanner>
               padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
               child: Row(
                 children: [
-                  const Icon(Icons.history, color: ConeColors.accent),
+                  Icon(Icons.history, color: ConeColors.accent),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

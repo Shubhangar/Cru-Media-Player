@@ -80,7 +80,7 @@ class MediaThumb extends StatelessWidget {
                   color: const Color(0xCC000000),
                   borderRadius: BorderRadius.circular(ConeRadius.sm),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.check, size: 12, color: ConeColors.accent),
@@ -173,7 +173,7 @@ class _MediaCardState extends State<MediaCard> {
                 children: [
                   widget.thumb,
                   if (_hover)
-                    const Center(
+                    Center(
                       child: CircleAvatar(
                         radius: 20,
                         backgroundColor: Color(0xCC000000),

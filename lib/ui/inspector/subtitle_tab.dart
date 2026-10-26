@@ -246,7 +246,7 @@ class SubtitleTab extends StatelessWidget {
             label: const Text('Load subtitle file…'),
             style: OutlinedButton.styleFrom(
               foregroundColor: ConeColors.text,
-              side: const BorderSide(color: ConeColors.border),
+              side: BorderSide(color: ConeColors.border),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(ConeRadius.md),
               ),

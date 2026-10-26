@@ -118,11 +118,7 @@ class HomeView extends StatelessWidget {
 
   Widget _hero() => Row(
     children: [
-      const Icon(
-        Icons.change_history_rounded,
-        size: 44,
-        color: ConeColors.accent,
-      ),
+      Icon(Icons.change_history_rounded, size: 44, color: ConeColors.accent),
       const SizedBox(width: 14),
       const Expanded(
         child: Column(
@@ -180,7 +176,7 @@ class HomeView extends StatelessWidget {
         style: _btnShape(
           OutlinedButton.styleFrom(
             foregroundColor: ConeColors.text,
-            side: const BorderSide(color: ConeColors.border),
+            side: BorderSide(color: ConeColors.border),
           ),
         ),
       );
@@ -194,7 +190,7 @@ class HomeView extends StatelessWidget {
       color: ConeColors.surface,
     ),
     alignment: Alignment.center,
-    child: const Column(
+    child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(Icons.file_download_outlined, size: 40, color: ConeColors.accent),
@@ -240,7 +236,7 @@ class HomeView extends StatelessWidget {
     color: ConeColors.surface,
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(ConeRadius.md),
-      side: const BorderSide(color: ConeColors.border),
+      side: BorderSide(color: ConeColors.border),
     ),
     child: InkWell(
       borderRadius: BorderRadius.circular(ConeRadius.md),

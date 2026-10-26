@@ -273,7 +273,7 @@ class ConeSwitch extends StatelessWidget {
       activeTrackColor: ConeColors.accent,
       inactiveThumbColor: ConeColors.textMuted,
       inactiveTrackColor: ConeColors.surfaceHigh,
-      trackOutlineColor: const WidgetStatePropertyAll(ConeColors.border),
+      trackOutlineColor: WidgetStatePropertyAll(ConeColors.border),
     ),
   );
 }
@@ -364,7 +364,7 @@ class DelayStepper extends StatelessWidget {
         backgroundColor: ConeColors.canvas,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ConeRadius.sm),
-          side: const BorderSide(color: ConeColors.border),
+          side: BorderSide(color: ConeColors.border),
         ),
       ),
       onPressed: f,
@@ -373,7 +373,8 @@ class DelayStepper extends StatelessWidget {
   );
 }
 
-const panelDivider = Divider(
+/// Getter, not a const: the border colour follows the active theme.
+Widget get panelDivider => Divider(
   height: 20,
   thickness: 1,
   indent: 16,

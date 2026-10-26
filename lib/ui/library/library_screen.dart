@@ -136,12 +136,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
         builder: (context, _) => Row(
           children: [
             _rail(),
-            const VerticalDivider(width: 1, color: ConeColors.border),
+            VerticalDivider(width: 1, color: ConeColors.border),
             Expanded(
               child: Column(
                 children: [
                   _toolbar(),
-                  const Divider(height: 1, color: ConeColors.border),
+                  Divider(height: 1, color: ConeColors.border),
                   Expanded(child: _body()),
                 ],
               ),
@@ -523,7 +523,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             label: const Text('Add folder'),
             style: OutlinedButton.styleFrom(
               foregroundColor: ConeColors.textMuted,
-              side: const BorderSide(color: ConeColors.border),
+              side: BorderSide(color: ConeColors.border),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(ConeRadius.md),
               ),
@@ -667,7 +667,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       color: ConeColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(ConeRadius.md),
-        side: const BorderSide(color: ConeColors.border),
+        side: BorderSide(color: ConeColors.border),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(ConeRadius.md),
@@ -698,7 +698,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             children: [
-              const Icon(Icons.folder, color: ConeColors.accent),
+              Icon(Icons.folder, color: ConeColors.accent),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -874,7 +874,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(ctx, 'new'),
-            child: const Row(
+            child: Row(
               children: [
                 Icon(Icons.add, size: 16, color: ConeColors.accent),
                 SizedBox(width: 8),
@@ -1064,7 +1064,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
             for (final p in singles)
               ListTile(
-                leading: const Icon(Icons.language, color: ConeColors.accent),
+                leading: Icon(Icons.language, color: ConeColors.accent),
                 title: Text(p.label),
                 subtitle: Text(
                   p.target,
@@ -1156,7 +1156,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       onSelected: (_) => setState(() => _channelGroup = g),
                       selectedColor: ConeColors.accentDim,
                       labelStyle: const TextStyle(fontSize: 12),
-                      side: const BorderSide(color: ConeColors.border),
+                      side: BorderSide(color: ConeColors.border),
                       showCheckmark: false,
                     ),
                   ),
@@ -1185,10 +1185,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
     margin: const EdgeInsets.only(bottom: 8),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(ConeRadius.md),
-      side: const BorderSide(color: ConeColors.border),
+      side: BorderSide(color: ConeColors.border),
     ),
     child: ListTile(
-      leading: const Icon(Icons.live_tv, color: ConeColors.accent),
+      leading: Icon(Icons.live_tv, color: ConeColors.accent),
       title: Text(src.name),
       subtitle: Text(
         src.error ??
@@ -1228,7 +1228,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       color: ConeColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(ConeRadius.md),
-        side: const BorderSide(color: ConeColors.border),
+        side: BorderSide(color: ConeColors.border),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(ConeRadius.md),
@@ -1338,13 +1338,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
               margin: const EdgeInsets.only(bottom: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(ConeRadius.md),
-                side: const BorderSide(color: ConeColors.border),
+                side: BorderSide(color: ConeColors.border),
               ),
               child: ListTile(
-                leading: const Icon(
-                  Icons.playlist_play,
-                  color: ConeColors.accent,
-                ),
+                leading: Icon(Icons.playlist_play, color: ConeColors.accent),
                 title: Text(pl.name),
                 subtitle: Text(
                   '${pl.items.length} item${pl.items.length == 1 ? '' : 's'}',
@@ -1356,7 +1353,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 onTap: () => setState(() => _playlistId = pl.id),
                 trailing: IconButton(
                   tooltip: 'Play',
-                  icon: const Icon(Icons.play_arrow, color: ConeColors.accent),
+                  icon: Icon(Icons.play_arrow, color: ConeColors.accent),
                   onPressed: pl.items.isEmpty ? null : () => act.play(pl.items),
                 ),
               ),

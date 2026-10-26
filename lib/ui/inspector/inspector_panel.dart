@@ -51,13 +51,13 @@ class InspectorPanel extends StatelessWidget {
             color: ConeColors.surface.withValues(alpha: 0.97),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(ConeRadius.lg),
-              side: const BorderSide(color: ConeColors.border),
+              side: BorderSide(color: ConeColors.border),
             ),
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
                 _header(),
-                const Divider(height: 1, color: ConeColors.border),
+                Divider(height: 1, color: ConeColors.border),
                 Expanded(
                   child: ListenableBuilder(
                     listenable: controller,

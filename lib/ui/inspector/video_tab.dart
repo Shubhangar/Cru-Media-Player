@@ -1,9 +1,12 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../player/models.dart';
+import '../../player/shaders.dart';
+import '../../settings/prefs.dart';
 import '../../player/player_controller.dart';
 import '../../theme.dart';
 import 'widgets.dart';
@@ -232,6 +235,8 @@ class _VideoTabState extends State<VideoTab> {
             ),
         ]),
         panelDivider,
+        if (c.shaders != null) ShaderSection(lib: c.shaders!),
+        panelDivider,
         SectionHeader(
           'Output',
           Icons.hd,
@@ -445,7 +450,7 @@ class _BeforeAfter extends StatelessWidget {
                             onPressed: onCancel,
                             style: OutlinedButton.styleFrom(
                               foregroundColor: ConeColors.text,
-                              side: const BorderSide(color: ConeColors.border),
+                              side: BorderSide(color: ConeColors.border),
                             ),
                             child: const Text('Cancel'),
                           ),
@@ -484,4 +489,102 @@ class _SourceSize extends StatelessWidget {
       );
     },
   );
+}
+
+/// Real-time GPU shaders: built-ins, the user's folder, and known packs.
+class ShaderSection extends StatelessWidget {
+  final ShaderLibrary lib;
+  const ShaderSection({super.key, required this.lib});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: lib.settings,
+      builder: (context, _) {
+        final active = lib.active;
+        final presets = lib.availablePresets();
+        final folder = lib.folderShaders();
+        String name(String p) => p.split(RegExp(r'[/\\]')).last;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SectionHeader(
+              'Shaders',
+              Icons.auto_fix_high,
+              Icons.auto_fix_high_outlined,
+              info:
+                  'Real-time GPU effects applied to the picture, such as '
+                  'upscaling (Anime4K, FSR) or sharpening. Heavier shaders '
+                  'need a capable graphics chip.',
+              trailing: active.isEmpty
+                  ? null
+                  : TextButton(
+                      onPressed: () => lib.setActive(const []),
+                      child: Text(
+                        'Turn off (${active.length})',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+            ),
+            if (presets.isNotEmpty)
+              ChipRow([
+                for (final (preset, paths) in presets)
+                  Tooltip(
+                    message: preset.description,
+                    child: ConeChip(
+                      label: preset.name,
+                      selected: active.join(';') == paths.join(';'),
+                      onTap: () => lib.setActive(paths),
+                    ),
+                  ),
+              ]),
+            for (final s in builtInShaders)
+              if (lib.builtInPath(s.id) case final path?)
+                SettingRow(
+                  label: s.name,
+                  info: s.description,
+                  child: ConeSwitch(
+                    value: active.contains(path),
+                    onChanged: (v) => lib.toggle(path, v),
+                  ),
+                ),
+            for (final path in folder)
+              SettingRow(
+                label: name(path),
+                child: ConeSwitch(
+                  value: active.contains(path),
+                  onChanged: (v) => lib.toggle(path, v),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      Prefs.shaderFolder.of(lib.settings).isEmpty
+                          ? 'Add a folder with Anime4K or FSR .glsl files to '
+                                'unlock one-click presets.'
+                          : '${folder.length} shader files in your folder.',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: ConeColors.textMuted,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      final d = await FilePicker.platform.getDirectoryPath();
+                      if (d != null) Prefs.shaderFolder.set(lib.settings, d);
+                    },
+                    child: const Text('Shader folder…'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }

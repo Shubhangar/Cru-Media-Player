@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:cone_player/player/player_controller.dart';
 import 'package:cone_player/player/settings_store.dart';
+import 'package:cone_player/settings/prefs.dart';
 import 'package:cone_player/ui/inspector/inspector_panel.dart';
 import 'package:cone_player/theme.dart';
 import 'package:cone_player/ui/player_screen.dart';
@@ -78,6 +79,7 @@ void main() {
     await windowManager.ensureInitialized();
 
     final c = PlayerController(settings: SettingsStore(prefix: testPrefix));
+    Prefs.onboarded.set(c.settings, true);
     final p = c.player;
     await tester.binding.setSurfaceSize(const Size(1280, 760));
     await tester.pumpWidget(
@@ -240,6 +242,7 @@ void main() {
     MediaKit.ensureInitialized();
     await windowManager.ensureInitialized();
     final c = PlayerController(settings: SettingsStore(prefix: testPrefix));
+    Prefs.onboarded.set(c.settings, true);
     final p = c.player;
     final mpv = p.platform as NativePlayer;
     Future<String> prop(String n) => mpv.getProperty(n);
@@ -270,12 +273,22 @@ void main() {
         .first;
     // Build lazily-built rows, then scroll them into the panel's viewport.
     Future<void> reveal(Finder f) async {
-      await tester.scrollUntilVisible(
-        f,
-        150,
-        scrollable: scrollable,
-        maxScrolls: 60,
-      );
+      // Search downwards first, then upwards (the target may be above).
+      try {
+        await tester.scrollUntilVisible(
+          f,
+          150,
+          scrollable: scrollable,
+          maxScrolls: 60,
+        );
+      } on StateError {
+        await tester.scrollUntilVisible(
+          f,
+          -150,
+          scrollable: scrollable,
+          maxScrolls: 60,
+        );
+      }
       await tester.ensureVisible(f);
       await settle(tester, 150);
     }

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:cone_player/player/opensubtitles.dart';
 import 'package:cone_player/player/player_controller.dart';
 import 'package:cone_player/player/settings_store.dart';
+import 'package:cone_player/settings/prefs.dart';
 import 'package:cone_player/theme.dart';
 import 'package:cone_player/ui/player_screen.dart';
 import 'package:cone_player/ui/subtitle_loader.dart';
@@ -41,6 +42,7 @@ void main() {
     File('${tmp.path}/Clip.fr.srt')
         .writeAsStringSync('1\n00:00:01,000 --> 00:00:02,000\nBonjour\n');
     final c = PlayerController(settings: SettingsStore(prefix: testPrefix));
+    Prefs.onboarded.set(c.settings, true);
     final p = c.player;
     await tester.binding.setSurfaceSize(const Size(1280, 760));
     await tester.pumpWidget(

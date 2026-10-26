@@ -11,8 +11,23 @@ void main() {
 
     test('boosts add a matching pre-gain to avoid clipping', () {
       final f = buildEqFilter(const [EqBand(1000, 6)]);
-      expect(f, startsWith('lavfi=[volume=-6.0dB,'));
+      // Only `equalizer` exists in the bundled ffmpeg (no `volume`).
+      expect(f, isNot(contains('volume')));
+      expect(f, startsWith('lavfi=[equalizer=f=1000:t=q:w=0.01:g=-6.0,'));
       expect(f, contains('equalizer=f=1000:t=q:w=1.00:g=6.0'));
+    });
+
+    test('pre-gain band is nearly flat across the audible range', () {
+      final band = [preGainBand(-6)];
+      for (final f in [40.0, 100.0, 1000.0, 10000.0, 16000.0]) {
+        expect(eqResponseDb(band, f), closeTo(-6, 1.0), reason: '$f Hz');
+      }
+    });
+
+    test('pre-gain keeps the boosted peak at or below 0 dB', () {
+      const boost = [EqBand(60, 6), EqBand(125, 5)];
+      final total = [...boost, preGainBand(-eqResponsePeak(boost))];
+      expect(eqResponsePeak(total), lessThan(1.0));
     });
 
     test('response peaks at the band centre with the band gain', () {

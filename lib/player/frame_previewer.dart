@@ -130,7 +130,13 @@ class FramePreviewer {
     child: IgnorePointer(
       child: Opacity(
         opacity: 0.01,
-        child: Video(controller: video, controls: NoVideoControls),
+        child: Video(
+          controller: video,
+          controls: NoVideoControls,
+          subtitleViewConfiguration: const SubtitleViewConfiguration(
+            visible: false,
+          ),
+        ),
       ),
     ),
   );

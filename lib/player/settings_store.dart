@@ -1,17 +1,55 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'eq.dart';
 import 'models.dart';
 
-/// Persists user preferences that should survive restarts.
-class SettingsStore {
+/// Persists user preferences that should survive restarts. Generic values
+/// (see `lib/settings/prefs.dart`) notify listeners when they change.
+class SettingsStore extends ChangeNotifier {
   final String prefix;
   SharedPreferences? _prefs;
+  final Map<String, Object> _memory = {}; // used before/without load()
   SettingsStore({this.prefix = 'cone.'});
 
   Future<void> load() async => _prefs = await SharedPreferences.getInstance();
+
+  /// Generic typed value with a default; see [Pref].
+  T value<T extends Object>(String key, T fallback) {
+    final v = _prefs?.get('$prefix$key') ?? _memory[key];
+    if (v is T) return v;
+    if (fallback is double && v is int) return v.toDouble() as T;
+    return fallback;
+  }
+
+  void setValue<T extends Object>(String key, T v) {
+    _memory[key] = v;
+    final k = '$prefix$key';
+    switch (v) {
+      case bool b:
+        _prefs?.setBool(k, b);
+      case int i:
+        _prefs?.setInt(k, i);
+      case double d:
+        _prefs?.setDouble(k, d);
+      case String s:
+        _prefs?.setString(k, s);
+      default:
+        throw ArgumentError('Unsupported preference type ${v.runtimeType}');
+    }
+    notifyListeners();
+  }
+
+  /// Removes generic values so defaults apply again.
+  void reset(Iterable<String> keys) {
+    for (final k in keys) {
+      _memory.remove(k);
+      _prefs?.remove('$prefix$k');
+    }
+    notifyListeners();
+  }
 
   T? _json<T>(String key, T Function(dynamic) parse) {
     final raw = _prefs?.getString('$prefix$key');

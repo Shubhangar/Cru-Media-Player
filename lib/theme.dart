@@ -1,16 +1,91 @@
 import 'package:flutter/material.dart';
 
+/// A canvas variant (General › Theme).
+class CanvasPalette {
+  final String id, name;
+  final Color canvas, surface, surfaceHigh, border;
+  const CanvasPalette(
+    this.id,
+    this.name,
+    this.canvas,
+    this.surface,
+    this.surfaceHigh,
+    this.border,
+  );
+}
+
+const canvasPalettes = [
+  CanvasPalette(
+    'charcoal',
+    'Charcoal',
+    Color(0xFF121212),
+    Color(0xFF1E1E1E),
+    Color(0xFF2A2A2A),
+    Color(0xFF333333),
+  ),
+  CanvasPalette(
+    'black',
+    'True black (OLED)',
+    Color(0xFF000000),
+    Color(0xFF111111),
+    Color(0xFF1C1C1C),
+    Color(0xFF2A2A2A),
+  ),
+  CanvasPalette(
+    'graphite',
+    'Graphite',
+    Color(0xFF1B1D21),
+    Color(0xFF25282D),
+    Color(0xFF30343A),
+    Color(0xFF3B4047),
+  ),
+];
+
+/// Accent choices (General › Accent). Cone orange is the identity colour.
+const accentChoices = <(String, Color)>[
+  ('Cone orange', Color(0xFFFF6600)),
+  ('Amber', Color(0xFFFFB300)),
+  ('Signal red', Color(0xFFE53935)),
+  ('Lime', Color(0xFF9CCC65)),
+  ('Sky', Color(0xFF29B6F6)),
+  ('Violet', Color(0xFFB388FF)),
+];
+
 /// Cone Player colour system: charcoal canvas + traffic-cone orange accent.
+/// Canvas and accent can be switched at runtime via [apply].
 class ConeColors {
-  static const canvas = Color(0xFF121212);
-  static const surface = Color(0xFF1E1E1E);
-  static const surfaceHigh = Color(0xFF2A2A2A);
-  static const border = Color(0xFF333333);
-  static const accent = Color(0xFFFF6600);
-  static const accentDim = Color(0x55FF6600);
+  static Color canvas = const Color(0xFF121212);
+  static Color surface = const Color(0xFF1E1E1E);
+  static Color surfaceHigh = const Color(0xFF2A2A2A);
+  static Color border = const Color(0xFF333333);
+  static Color accent = const Color(0xFFFF6600);
+  static Color accentDim = const Color(0x55FF6600);
   static const text = Color(0xFFEDEDED);
   static const textMuted = Color(0xFF9A9A9A);
   static const coneStripe = Color(0xFFF2F2F2);
+
+  static void apply({CanvasPalette? palette, Color? accentColor}) {
+    if (palette != null) {
+      canvas = palette.canvas;
+      surface = palette.surface;
+      surfaceHigh = palette.surfaceHigh;
+      border = palette.border;
+    }
+    if (accentColor != null) {
+      accent = accentColor;
+      accentDim = accentColor.withValues(alpha: 0x55 / 255);
+    }
+  }
+}
+
+/// Control size (Interface › Control size).
+class ConeDensity {
+  static double scale = 1.0;
+  static double forName(String d) => switch (d) {
+    'compact' => 0.85,
+    'large' => 1.25,
+    _ => 1.0,
+  };
 }
 
 class ConeRadius {
@@ -44,7 +119,7 @@ ThemeData buildConeTheme() {
       color: ConeColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(ConeRadius.md),
-        side: const BorderSide(color: ConeColors.border),
+        side: BorderSide(color: ConeColors.border),
       ),
       textStyle: const TextStyle(color: ConeColors.text, fontSize: 13),
     ),
@@ -52,10 +127,10 @@ ThemeData buildConeTheme() {
       backgroundColor: ConeColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(ConeRadius.lg),
-        side: const BorderSide(color: ConeColors.border),
+        side: BorderSide(color: ConeColors.border),
       ),
     ),
-    sliderTheme: const SliderThemeData(
+    sliderTheme: SliderThemeData(
       activeTrackColor: ConeColors.accent,
       inactiveTrackColor: ConeColors.border,
       thumbColor: ConeColors.accent,
@@ -66,11 +141,11 @@ ThemeData buildConeTheme() {
       fillColor: ConeColors.canvas,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(ConeRadius.sm),
-        borderSide: const BorderSide(color: ConeColors.border),
+        borderSide: BorderSide(color: ConeColors.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(ConeRadius.sm),
-        borderSide: const BorderSide(color: ConeColors.accent),
+        borderSide: BorderSide(color: ConeColors.accent),
       ),
     ),
   );

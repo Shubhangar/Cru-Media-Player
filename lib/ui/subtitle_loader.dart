@@ -71,7 +71,7 @@ class _SubtitleLoader extends StatelessWidget {
             ],
           ),
         ),
-        const TabBar(
+        TabBar(
           indicatorColor: ConeColors.accent,
           labelColor: ConeColors.accent,
           unselectedLabelColor: ConeColors.textMuted,
@@ -137,15 +137,9 @@ class _ThisFile extends StatelessWidget {
         for (final s in nearby)
           ListTile(
             dense: true,
-            leading: const Icon(
-              Icons.subtitles_outlined,
-              color: ConeColors.accent,
-            ),
+            leading: Icon(Icons.subtitles_outlined, color: ConeColors.accent),
             title: Text(_name(s)),
-            trailing: const Text(
-              'Load',
-              style: TextStyle(color: ConeColors.accent),
-            ),
+            trailing: Text('Load', style: TextStyle(color: ConeColors.accent)),
             onTap: () async {
               await c.loadSubtitle(s);
               if (context.mounted) Navigator.pop(context);

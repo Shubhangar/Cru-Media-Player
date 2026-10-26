@@ -40,11 +40,7 @@ class MusicView extends StatelessWidget {
                 colors: [Color(0xFF3A2414), Color(0xFF1E1E1E)],
               ),
             ),
-            child: const Icon(
-              Icons.music_note,
-              size: 120,
-              color: ConeColors.accent,
-            ),
+            child: Icon(Icons.music_note, size: 120, color: ConeColors.accent),
           );
 
     return Stack(
@@ -137,7 +133,7 @@ class _TrackInfo extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'NOW PLAYING',
               style: TextStyle(
                 fontSize: 11,

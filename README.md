@@ -25,6 +25,10 @@ flutter run -d macos     # or: -d windows / -d linux
   `library.json` in the app-support folder, with thumbnails in `thumbs/`.
 - The bundled ffmpeg has no PNG decoder, so cover art is extracted by the
   app (`lib/library/cover_art.dart`) rather than by mpv.
+- Its only audio filter is `equalizer` (no `volume`, `dynaudnorm`, …): the
+  EQ's anti-clipping pre-gain is a very wide equalizer band.
+- Subtitles are rendered by mpv/libass (`libass: true`) so the Subtitles
+  tab's styling is what you see; media_kit's Flutter subtitle overlay is off.
 
 ## Tests
 
@@ -66,6 +70,8 @@ Windows and Linux binaries must be built on those systems (or in CI).
 | Ctrl/⌘ + I | Inspector (subtitles, audio, video, playback) |
 | Ctrl/⌘ + Shift + L | Library |
 | Ctrl/⌘ + W | Close media (back to Home) |
+| Ctrl/⌘ + , | Settings |
+| S | Screenshot |
 | Enter / Esc | Accept / dismiss the resume prompt |
 
 ## Mouse & trackpad
@@ -112,5 +118,15 @@ Windows and Linux binaries must be built on those systems (or in CI).
    - Subtitle loader: sidecars (incl. Subs/ folders), folder batch matching
      for the queue (names or S01E02/1x02), OpenSubtitles.com search by
      file hash + title and download (bring your own free API key).
-5. Settings (10 panels), layout customizer, onboarding, shaders, multi-window sync.
+5. ✅ Settings & personalisation:
+   - Settings with 10 panels (General, Interface, Privacy, Controls,
+     Playback, Video, Audio, Subtitle, Library, Network & more), search,
+     per-panel reset, and a plain-language info icon on every entry.
+   - Themes (Charcoal / True black / Graphite) and accent colours, live.
+   - First-run onboarding: look, control size + starter layout, shortcuts.
+   - Drag-and-drop control bar customizer with switchable saved profiles.
+   - GPU shaders: built-in sharpen / line-art / denoise, your own GLSL
+     folder, one-click Anime4K (modes A/B/C) and FSR chains when present.
+   - Screenshots (S) to a chosen folder as PNG or JPEG.
+   - Multi-window sync grid: (next).
 6. Convert, capture device, cast.
