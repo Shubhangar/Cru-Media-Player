@@ -32,6 +32,8 @@ import 'settings/settings_screen.dart';
 import 'layout/control_layout.dart';
 import 'layout/layout_editor.dart';
 import 'onboarding.dart';
+import 'multiview_view.dart';
+import '../player/multiview.dart';
 import '../player/settings_store.dart';
 import '../settings/prefs.dart';
 import 'seek_bar.dart';
@@ -73,6 +75,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ),
       );
   late final _previewer = widget.previewer ?? FramePreviewer();
+  late final _multi = MultiView(p);
+
+  @visibleForTesting
+  MultiView get debugMultiView => _multi;
+
+  Future<void> _openMultiView() async {
+    if (_multi.feeds.isEmpty) {
+      await addFeedFlow(context, c, _multi);
+    } else {
+      _multi.setMode(MultiMode.grid);
+    }
+  }
 
   SettingsStore get _s => c.settings;
   bool _settingsOpen = false;
@@ -190,6 +204,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     c.addListener(() => mounted ? setState(() {}) : null);
     _s.addListener(_onPrefs);
     _onPrefs();
+    _multi.addListener(() => mounted ? setState(() {}) : null);
     c.init().then((_) {
       if (widget.initialFiles.isNotEmpty) c.openAll(widget.initialFiles);
     });
@@ -205,6 +220,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _s.removeListener(_onPrefs);
     c.dispose();
     _previewer.dispose();
+    _multi.dispose();
     _focus.dispose();
     super.dispose();
   }
@@ -352,6 +368,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
         }
       } else if (k == LogicalKeyboardKey.keyI) {
         _toggleInspector();
+      } else if (k == LogicalKeyboardKey.keyG && _hasMedia) {
+        _multi.mode == MultiMode.grid
+            ? _multi.setMode(MultiMode.floating)
+            : _openMultiView();
       } else if (k == LogicalKeyboardKey.comma) {
         _settingsOpen ? setState(() => _settingsOpen = false) : _openSettings();
       } else if (k == LogicalKeyboardKey.keyW && _hasMedia) {
@@ -370,6 +390,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (!Prefs.onboarded.of(_s)) {
       if (k == LogicalKeyboardKey.escape) Prefs.onboarded.set(_s, true);
       return KeyEventResult.ignored;
+    }
+    if (_multi.mode == MultiMode.grid && k == LogicalKeyboardKey.escape) {
+      _multi.setMode(MultiMode.floating);
+      return KeyEventResult.handled;
     }
     if (_settingsOpen && k == LogicalKeyboardKey.escape) {
       setState(() => _settingsOpen = false);
@@ -579,6 +603,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               ),
                       ),
                     if (_dragging) Positioned.fill(child: _dropHint()),
+                    if (_multi.mode == MultiMode.floating)
+                      Positioned.fill(
+                        child: MultiViewFloating(
+                          mv: _multi,
+                          onGrid: () => _multi.setMode(MultiMode.grid),
+                        ),
+                      ),
                     Positioned(
                       top: 0,
                       left: 0,
@@ -615,6 +646,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         onLoadSubtitle: loader.openSubtitle,
                       ),
                     ),
+                    if (_multi.mode == MultiMode.grid)
+                      Positioned.fill(
+                        child: MultiViewGrid(c: c, mv: _multi),
+                      ),
                     if (c.resumeOffer != null && !_libraryOpen)
                       Positioned(
                         left: 0,
@@ -919,6 +954,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   detail: '$_mod+Shift+L',
                   icon: Icons.video_library_outlined,
                   onTap: _openLibrary,
+                ),
+              if (_hasMedia)
+                FlyoutItem(
+                  label: 'Multi-view',
+                  detail: '$_mod+G',
+                  icon: Icons.grid_view,
+                  onTap: _openMultiView,
                 ),
               FlyoutItem(
                 label: 'Settings',

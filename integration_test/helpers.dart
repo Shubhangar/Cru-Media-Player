@@ -91,3 +91,20 @@ Future<int> countPixels(
   }
   return n;
 }
+
+/// Average brightness (0..255) of [rect] (logical pixels) in the app image.
+Future<double> meanBrightness(WidgetTester tester, Rect rect) async {
+  final (data, width) = await captureRgba(tester);
+  var sum = 0.0;
+  var n = 0;
+  for (var y = rect.top.ceil(); y < rect.bottom.floor(); y += 4) {
+    for (var x = rect.left.ceil(); x < rect.right.floor(); x += 4) {
+      final i = (y * width + x) * 4;
+      if (i + 2 >= data.lengthInBytes) continue;
+      sum +=
+          (data.getUint8(i) + data.getUint8(i + 1) + data.getUint8(i + 2)) / 3;
+      n++;
+    }
+  }
+  return n == 0 ? 0 : sum / n;
+}
