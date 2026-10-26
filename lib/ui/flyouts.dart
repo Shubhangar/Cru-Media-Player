@@ -211,6 +211,7 @@ String trackLabel({String? title, String? language, required String id}) {
 List<Widget> subtitleFlyout({
   required Player player,
   required VoidCallback onLoadFile,
+  VoidCallback? onFind,
 }) {
   final tracks = player.state.tracks.subtitle
       .where((t) => t.id != 'auto')
@@ -233,6 +234,13 @@ List<Widget> subtitleFlyout({
       icon: Icons.file_open_outlined,
       onTap: onLoadFile,
     ),
+    if (onFind != null)
+      FlyoutItem(
+        label: 'Find subtitles…',
+        detail: 'Folder · Online',
+        icon: Icons.travel_explore,
+        onTap: onFind,
+      ),
   ];
 }
 

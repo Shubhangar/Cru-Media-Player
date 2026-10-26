@@ -11,7 +11,9 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../library/library_store.dart';
+import '../player/frame_previewer.dart';
 import '../player/media_loader.dart';
+import '../player/waveform.dart';
 import '../player/player_controller.dart';
 import '../theme.dart';
 import 'cone_volume.dart';
@@ -24,6 +26,8 @@ import 'library/media_widgets.dart';
 import 'music_view.dart';
 import 'queue_panel.dart';
 import 'resume_banner.dart';
+import 'subtitle_loader.dart';
+import 'subtitle_timeline.dart';
 import 'seek_bar.dart';
 
 final bool _isMac = Platform.isMacOS;
@@ -33,11 +37,15 @@ class PlayerScreen extends StatefulWidget {
   final List<String> initialFiles;
   final PlayerController? controller;
   final LibraryStore? library;
+
+  /// Injectable for tests; one is created otherwise.
+  final FramePreviewer? previewer;
   const PlayerScreen({
     super.key,
     this.initialFiles = const [],
     this.controller,
     this.library,
+    this.previewer,
   });
 
   @override
@@ -45,7 +53,24 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  late final c = widget.controller ?? PlayerController(library: widget.library);
+  late final c =
+      widget.controller ??
+      PlayerController(
+        library: widget.library,
+        waveforms: WaveformService(
+          Directory(
+            '${widget.library?.dir.path ?? Directory.systemTemp.path}/waveforms',
+          ),
+        ),
+      );
+  late final _previewer = widget.previewer ?? FramePreviewer();
+
+  Future<Uint8List?> _previewAt(Duration t) async {
+    final uri = c.currentUri;
+    if (uri == null || c.isAudioOnly) return null;
+    return _previewer.frameAt(uri, p.state.duration, t);
+  }
+
   LibraryStore? get _lib => c.library;
 
   // Full-window library over the player.
@@ -79,7 +104,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   final List<StreamSubscription> _subs = [];
 
   // Edge-proximity auto-hide.
-  static const _topZone = 90.0, _bottomZone = 150.0;
+  static const _topZone = 90.0;
+  double get _bottomZone => c.showSubtitleTimeline ? 240 : 150;
   bool _nearTop = false, _nearBottom = false, _pointerIdle = false;
   Timer? _idleTimer;
 
@@ -107,7 +133,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Rect? _boundsBeforePip;
   double _brightness = 0; // accumulates small gesture deltas
   bool _dragging = false;
-  bool _subsLifted = false;
+  int _subMargin = -1;
 
   Player get p => c.player;
 
@@ -141,6 +167,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     _idleTimer?.cancel();
     c.dispose();
+    _previewer.dispose();
     _focus.dispose();
     super.dispose();
   }
@@ -357,11 +384,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Keep subtitles clear of the bottom bar while it is shown.
-    final lift = _showBottom && _hasMedia;
-    if (lift != _subsLifted) {
-      _subsLifted = lift;
-      c.liftSubtitles(lift);
+    // Keep subtitles clear of the bottom bar while it is shown. mpv's
+    // margin is in 720-line units, so convert from this window's pixels.
+    final barPx = !(_showBottom && _hasMedia)
+        ? 0.0
+        : 112.0 + (c.showSubtitleTimeline ? 90.0 : 0.0);
+    final winH = MediaQuery.sizeOf(context).height;
+    final margin = 22 + (winH <= 0 ? 0 : (barPx / winH * 720).round());
+    if (margin != _subMargin) {
+      _subMargin = margin;
+      c.setSubtitleMargin(margin);
     }
     return Focus(
       focusNode: _focus,
@@ -423,6 +455,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 }),
                 child: Stack(
                   children: [
+                    _previewer.surface(),
                     Positioned.fill(child: _videoLayer(box)),
                     if (!_hasMedia)
                       Positioned.fill(
@@ -577,7 +610,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
           },
           // Flips are a GPU transform here (cheap, works with hwdec).
           child: c.isAudioOnly
-              ? MusicView(c: c)
+              ? MusicView(
+                  c: c,
+                  waveform: StreamBuilder<Duration>(
+                    stream: p.stream.position,
+                    builder: (_, _) => SeekBar(
+                      position: p.state.position,
+                      duration: p.state.duration,
+                      buffer: p.state.buffer,
+                      bookmarks: c.bookmarks,
+                      onSeek: p.seek,
+                      onFrameStep: (fwd) => c.frameStep(fwd, 'Scroll'),
+                      waveform: c.waveform,
+                      waveformHeight: 72,
+                    ),
+                  ),
+                )
               : Transform.scale(
                   scaleX: c.adjust.hflip ? -1 : 1,
                   scaleY: c.adjust.vflip ? -1 : 1,
@@ -695,9 +743,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 ),
               const Divider(height: 10, color: ConeColors.border),
               FlyoutItem(
-                label: 'Load subtitle…',
+                label: 'Subtitles…',
+                detail: 'File · Folder · Online',
                 icon: Icons.subtitles_outlined,
-                onTap: loader.openSubtitle,
+                onTap: () => showSubtitleLoader(context, c),
               ),
               if (_lib != null)
                 FlyoutItem(
@@ -837,8 +886,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 active:
                     p.state.track.subtitle.id != 'no' &&
                     p.state.track.subtitle.id != 'auto',
-                builder: () =>
-                    subtitleFlyout(player: p, onLoadFile: loader.openSubtitle),
+                builder: () => subtitleFlyout(
+                  player: p,
+                  onLoadFile: loader.openSubtitle,
+                  onFind: () => showSubtitleLoader(context, c),
+                ),
               ),
               FlyoutButton(
                 icon: Icons.graphic_eq,
@@ -854,18 +906,41 @@ class _PlayerScreenState extends State<PlayerScreen> {
               const SizedBox(width: 4),
             ],
           ),
-          const SizedBox(height: 2),
-          StreamBuilder<Duration>(
-            stream: p.stream.position,
-            builder: (_, _) => SeekBar(
-              position: p.state.position,
-              duration: p.state.duration,
-              buffer: p.state.buffer,
-              bookmarks: c.bookmarks,
-              onSeek: p.seek,
-              onFrameStep: (fwd) => c.frameStep(fwd, 'Scroll'),
+          // Music shows a large waveform scrubber in its own layout.
+          if (!c.isAudioOnly && c.showSubtitleTimeline) ...[
+            const SizedBox(height: 6),
+            if (c.cues == null)
+              SubtitleTimelineHint(onLoad: loader.openSubtitle)
+            else
+              StreamBuilder<Duration>(
+                stream: p.stream.position,
+                builder: (_, _) => SubtitleTimeline(
+                  cues: c.cues!,
+                  position: p.state.position,
+                  duration: p.state.duration,
+                  delay: c.subDelay,
+                  waveform: c.waveform,
+                  onDelay: c.setSubDelay,
+                  onSeek: p.seek,
+                ),
+              ),
+          ],
+          if (!c.isAudioOnly) ...[
+            const SizedBox(height: 2),
+            StreamBuilder<Duration>(
+              stream: p.stream.position,
+              builder: (_, _) => SeekBar(
+                position: p.state.position,
+                duration: p.state.duration,
+                buffer: p.state.buffer,
+                bookmarks: c.bookmarks,
+                onSeek: p.seek,
+                onFrameStep: (fwd) => c.frameStep(fwd, 'Scroll'),
+                waveform: c.showWaveform ? c.waveform : null,
+                preview: _previewAt,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

@@ -232,8 +232,18 @@ class LibraryStore extends ChangeNotifier {
     _saveTimer = Timer(const Duration(milliseconds: 400), save);
   }
 
-  Future<void> save() async {
+  Future<void> _saving = Future.value();
+
+  /// Writes atomically (temp file + rename). Saves are queued so two never
+  /// race on the same temp file; failures are logged, not thrown.
+  Future<void> save() {
     _saveTimer?.cancel();
+    return _saving = _saving.then((_) => _write()).catchError((Object e) {
+      debugPrint('library: save failed: $e');
+    });
+  }
+
+  Future<void> _write() async {
     final json = jsonEncode({
       'history': [for (final h in history.values) h.toJson()],
       'pins': [for (final p in pins) p.toJson()],

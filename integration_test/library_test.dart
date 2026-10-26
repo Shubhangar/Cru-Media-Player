@@ -235,6 +235,7 @@ void main() {
       reason: 'queueing must not interrupt playback',
     );
 
-    await lib.save();
+    await tester.pumpWidget(const SizedBox());
+    await tester.runAsync(lib.save);
   });
 }

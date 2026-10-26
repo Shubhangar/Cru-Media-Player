@@ -102,6 +102,15 @@ Windows and Linux binaries must be built on those systems (or in CI).
      channel zapping with N/P.
    - Queue panel Library tab: drag items into the queue while playing.
    - Music layout with cover art (embedded M4A/MP3/FLAC art or folder images).
-4. Seek thumbnails, waveform, subtitle timeline sync, OpenSubtitles.
+4. ✅ Scrubbing & subtitles:
+   - Frame previews when hovering/dragging the seek bar (hidden second
+     player; keyframe seek with exact-seek fallback; cached).
+   - Audio waveform (hidden mpv decodes to low-rate PCM; cached on disk) on
+     the seek bar (toggle) and as the music view's scrubber.
+   - Subtitle timeline over the waveform: drag blocks to re-sync (sets the
+     subtitle delay), click to seek, Ctrl/⌘-scroll to zoom. SRT/VTT/ASS.
+   - Subtitle loader: sidecars (incl. Subs/ folders), folder batch matching
+     for the queue (names or S01E02/1x02), OpenSubtitles.com search by
+     file hash + title and download (bring your own free API key).
 5. Settings (10 panels), layout customizer, onboarding, shaders, multi-window sync.
 6. Convert, capture device, cast.

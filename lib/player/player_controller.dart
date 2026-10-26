@@ -9,6 +9,8 @@ import 'eq.dart';
 import 'format.dart';
 import 'models.dart';
 import 'settings_store.dart';
+import 'subtitles.dart';
+import 'waveform.dart';
 
 /// A short on-screen notice: what happened and which shortcut caused it.
 class OsdMessage {
@@ -26,8 +28,33 @@ class Bookmark {
 
 /// Owns the mpv-backed [Player] and the UI-level state around it.
 class PlayerController extends ChangeNotifier {
-  PlayerController({SettingsStore? settings, this.library})
+  PlayerController({SettingsStore? settings, this.library, this.waveforms})
     : settings = settings ?? SettingsStore();
+
+  /// Builds audio waveforms; null disables waveform features.
+  final WaveformService? waveforms;
+  Waveform? waveform;
+  String? _waveUri;
+
+  /// Waveform is shown on the seek bar, the subtitle timeline or for music.
+  bool get needsWaveform => showWaveform || showSubtitleTimeline || isAudioOnly;
+
+  void _refreshWaveform() {
+    final uri = currentUri;
+    if (waveforms == null || uri == null) return;
+    if (uri != _waveUri) {
+      waveform = waveforms!.cached(uri);
+      _waveUri = uri;
+      notifyListeners();
+    }
+    if (waveform != null || !needsWaveform) return;
+    waveforms!.load(uri).then((w) {
+      if (w != null && currentUri == uri) {
+        waveform = w;
+        notifyListeners();
+      }
+    });
+  }
 
   final SettingsStore settings;
 
@@ -118,6 +145,28 @@ class PlayerController extends ChangeNotifier {
   Future<void> loadSubtitle(String uri) async {
     await player.setSubtitleTrack(SubtitleTrack.uri(uri));
     notify('Subtitle loaded');
+  }
+
+  /// Subtitle files chosen for specific queue items (folder batch / online
+  /// fetch); each is loaded when its item starts playing.
+  final Map<String, String> assignedSubtitles = {};
+  String? _assignedAppliedFor;
+
+  Future<void> assignSubtitles(Map<String, String> map) async {
+    assignedSubtitles.addAll(map);
+    _assignedAppliedFor = null;
+    await _applyAssignedSubtitle();
+    notifyListeners();
+  }
+
+  Future<void> _applyAssignedSubtitle() async {
+    final uri = currentUri;
+    if (uri == null || player.state.duration <= Duration.zero) return;
+    if (_assignedAppliedFor == uri) return;
+    final sub = assignedSubtitles[uri];
+    if (sub == null) return;
+    _assignedAppliedFor = uri;
+    await loadSubtitle(sub);
   }
 
   String get title {
@@ -244,6 +293,8 @@ class PlayerController extends ChangeNotifier {
     eqPresetId = settings.eqPresetId;
     audioLanguages = settings.audioLanguages;
     subtitleLanguages = settings.subtitleLanguages;
+    showWaveform = settings.showWaveform;
+    showSubtitleTimeline = settings.showSubtitleTimeline;
     await _applyDiff(const {}, subStyle.toMpv(), force: true);
     if (eqEnabled) await _prop('af', buildEqFilter(eqBands));
     if (audioLanguages.isNotEmpty) await _prop('alang', audioLanguages);
@@ -252,6 +303,13 @@ class PlayerController extends ChangeNotifier {
       if (done) _recordProgress(finished: true);
       if (done && sleepAtEnd) _finishSleep();
     });
+    _waveSubs = [
+      player.stream.duration.listen((_) => _refreshWaveform()),
+      player.stream.tracks.listen((_) => _refreshWaveform()),
+      player.stream.track.listen((_) => refreshCues()),
+      player.stream.duration.listen((_) => refreshCues()),
+      player.stream.duration.listen((_) => _applyAssignedSubtitle()),
+    ];
     if (library != null) {
       _historySubs = [
         player.stream.duration.listen((_) => _checkFileChange()),
@@ -269,7 +327,7 @@ class PlayerController extends ChangeNotifier {
   String? _trackedUri;
   DateTime _lastSaved = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime? _lastThumb;
-  List<StreamSubscription>? _historySubs;
+  List<StreamSubscription>? _historySubs, _waveSubs;
 
   String? get currentUri {
     final pl = player.state.playlist;
@@ -468,9 +526,13 @@ class PlayerController extends ChangeNotifier {
   }
 
   void setOverlay({bool? waveform, bool? subtitleTimeline}) {
-    if (waveform != null) showWaveform = waveform;
-    if (subtitleTimeline != null) showSubtitleTimeline = subtitleTimeline;
+    if (waveform != null) settings.showWaveform = showWaveform = waveform;
+    if (subtitleTimeline != null) {
+      settings.showSubtitleTimeline = showSubtitleTimeline = subtitleTimeline;
+    }
     notifyListeners();
+    _refreshWaveform();
+    refreshCues();
   }
 
   String? _keepOpenBefore;
@@ -575,13 +637,27 @@ class PlayerController extends ChangeNotifier {
     };
   }
 
+  /// Cues of the active external subtitle file, for the timeline.
+  List<Cue>? cues;
+  String? cuesPath;
+
+  Future<void> refreshCues() async {
+    if (!showSubtitleTimeline) return;
+    final path = await _get('current-tracks/sub/external-filename');
+    final next = path.isEmpty ? null : path;
+    if (next == cuesPath && (cues != null || next == null)) return;
+    cuesPath = next;
+    cues = next == null ? null : await loadCues(next);
+    notifyListeners();
+  }
+
   /// Title / artist / album tags of the current file.
   Future<Map<String, String>> trackTags() async =>
       parseTags(await _get('metadata'));
 
-  /// Raises subtitles above the bottom bar (mpv units: 720-line script res).
-  Future<void> liftSubtitles(bool lift) =>
-      _prop('sub-margin-y', lift ? '100' : '22');
+  /// Bottom subtitle margin in mpv's 720-line units (keeps text above bars).
+  Future<void> setSubtitleMargin(int margin) =>
+      _prop('sub-margin-y', '$margin');
 
   void toggleUi([String? key]) {
     uiHidden = !uiHidden;
@@ -593,7 +669,7 @@ class PlayerController extends ChangeNotifier {
   void dispose() {
     _recordProgress();
     library?.save();
-    for (final sub in _historySubs ?? const <StreamSubscription>[]) {
+    for (final sub in [...?_historySubs, ...?_waveSubs]) {
       sub.cancel();
     }
     _sleepTimer?.cancel();

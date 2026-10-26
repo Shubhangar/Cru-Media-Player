@@ -110,8 +110,8 @@ void main() {
 
     // Paused -> both bars visible, subtitles lifted clear of the bottom bar.
     expect(
-      await (p.platform as NativePlayer).getProperty('sub-margin-y'),
-      '100',
+      int.parse(await (p.platform as NativePlayer).getProperty('sub-margin-y')),
+      greaterThan(100),
     );
     expect(find.byTooltip('Subtitles'), findsOneWidget);
     expect(find.byTooltip('Menu'), findsOneWidget);

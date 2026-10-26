@@ -66,6 +66,17 @@ class SettingsStore {
   String get eqPresetId => _prefs?.getString('${prefix}eqPreset') ?? 'flat';
   set eqPresetId(String v) => _prefs?.setString('${prefix}eqPreset', v);
 
+  bool get showWaveform => _prefs?.getBool('${prefix}showWaveform') ?? false;
+  set showWaveform(bool v) => _prefs?.setBool('${prefix}showWaveform', v);
+  bool get showSubtitleTimeline =>
+      _prefs?.getBool('${prefix}showSubTimeline') ?? false;
+  set showSubtitleTimeline(bool v) =>
+      _prefs?.setBool('${prefix}showSubTimeline', v);
+
+  /// OpenSubtitles.com consumer API key (user-provided).
+  String get openSubtitlesKey => _prefs?.getString('${prefix}osKey') ?? '';
+  set openSubtitlesKey(String v) => _prefs?.setString('${prefix}osKey', v);
+
   /// Comma-separated language priority lists, e.g. "en,eng".
   String get audioLanguages => _prefs?.getString('${prefix}alang') ?? '';
   set audioLanguages(String v) => _prefs?.setString('${prefix}alang', v);
