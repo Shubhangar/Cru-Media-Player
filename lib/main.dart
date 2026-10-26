@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
@@ -5,7 +7,7 @@ import 'package:window_manager/window_manager.dart';
 import 'theme.dart';
 import 'ui/player_screen.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   await windowManager.ensureInitialized();
@@ -22,17 +24,22 @@ Future<void> main() async {
       await windowManager.focus();
     },
   );
-  runApp(const ConePlayerApp());
+  // Only real files and URLs: macOS/Xcode may add flags like "-NSFoo YES".
+  final files = args
+      .where((a) => a.contains('://') || File(a).existsSync())
+      .toList();
+  runApp(ConePlayerApp(initialFiles: files));
 }
 
 class ConePlayerApp extends StatelessWidget {
-  const ConePlayerApp({super.key});
+  final List<String> initialFiles;
+  const ConePlayerApp({super.key, this.initialFiles = const []});
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Cone Player',
-        debugShowCheckedModeBanner: false,
-        theme: buildConeTheme(),
-        home: const PlayerScreen(),
-      );
+    title: 'Cone Player',
+    debugShowCheckedModeBanner: false,
+    theme: buildConeTheme(),
+    home: PlayerScreen(initialFiles: initialFiles),
+  );
 }

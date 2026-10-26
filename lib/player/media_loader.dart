@@ -8,9 +8,33 @@ import '../theme.dart';
 import 'player_controller.dart';
 
 const mediaExtensions = {
-  'mp4', 'mkv', 'webm', 'mov', 'avi', 'wmv', 'flv', 'm4v', 'mpg', 'mpeg',
-  'ts', 'm2ts', '3gp', 'ogv', 'mp3', 'flac', 'wav', 'm4a', 'aac', 'ogg',
-  'opus', 'wma', 'alac', 'aiff', 'm3u', 'm3u8', 'pls',
+  'mp4',
+  'mkv',
+  'webm',
+  'mov',
+  'avi',
+  'wmv',
+  'flv',
+  'm4v',
+  'mpg',
+  'mpeg',
+  'ts',
+  'm2ts',
+  '3gp',
+  'ogv',
+  'mp3',
+  'flac',
+  'wav',
+  'm4a',
+  'aac',
+  'ogg',
+  'opus',
+  'wma',
+  'alac',
+  'aiff',
+  'm3u',
+  'm3u8',
+  'pls',
 };
 
 const subtitleExtensions = ['srt', 'ass', 'ssa', 'vtt', 'sub', 'idx', 'sup'];
@@ -36,13 +60,14 @@ class MediaLoader {
   Future<void> openFolder() async {
     final dir = await FilePicker.platform.getDirectoryPath();
     if (dir == null) return;
-    final files = Directory(dir)
-        .listSync(recursive: true, followLinks: false)
-        .whereType<File>()
-        .map((f) => f.path)
-        .where(isMediaPath)
-        .toList()
-      ..sort();
+    final files =
+        Directory(dir)
+            .listSync(recursive: true, followLinks: false)
+            .whereType<File>()
+            .map((f) => f.path)
+            .where(isMediaPath)
+            .toList()
+          ..sort();
     if (files.isEmpty) {
       c.notify('No media found in folder');
       return;
@@ -52,7 +77,9 @@ class MediaLoader {
 
   Future<void> openSubtitle() async {
     final r = await FilePicker.platform.pickFiles(
-        type: FileType.custom, allowedExtensions: subtitleExtensions);
+      type: FileType.custom,
+      allowedExtensions: subtitleExtensions,
+    );
     final p = r?.files.single.path;
     if (p != null) await c.loadSubtitle(p);
   }
@@ -83,29 +110,37 @@ class MediaLoader {
         title: const Text('Open network stream'),
         content: SizedBox(
           width: 460,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              decoration: const InputDecoration(
-                  hintText: 'https://…/video.mp4  or  …/playlist.m3u'),
-              onSubmitted: (v) => Navigator.pop(ctx, v),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Direct video links, HLS/DASH streams and M3U/IPTV playlists are supported.',
-              style: TextStyle(fontSize: 12, color: ConeColors.textMuted),
-            ),
-          ]),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'https://…/video.mp4  or  …/playlist.m3u',
+                ),
+                onSubmitted: (v) => Navigator.pop(ctx, v),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Direct video links, HLS/DASH streams and M3U/IPTV playlists are supported.',
+                style: TextStyle(fontSize: 12, color: ConeColors.textMuted),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel',
-                  style: TextStyle(color: ConeColors.textMuted))),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: ConeColors.textMuted),
+            ),
+          ),
           FilledButton(
-              onPressed: () => Navigator.pop(ctx, ctrl.text),
-              child: const Text('Play')),
+            onPressed: () => Navigator.pop(ctx, ctrl.text),
+            child: const Text('Play'),
+          ),
         ],
       ),
     );

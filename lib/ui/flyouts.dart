@@ -10,14 +10,17 @@ class FlyoutHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-        child: Text(text.toUpperCase(),
-            style: const TextStyle(
-                fontSize: 11,
-                letterSpacing: 0.8,
-                fontWeight: FontWeight.w600,
-                color: ConeColors.textMuted)),
-      );
+    padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+    child: Text(
+      text.toUpperCase(),
+      style: const TextStyle(
+        fontSize: 11,
+        letterSpacing: 0.8,
+        fontWeight: FontWeight.w600,
+        color: ConeColors.textMuted,
+      ),
+    ),
+  );
 }
 
 /// A selectable row with an orange check when active.
@@ -38,38 +41,103 @@ class FlyoutItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MenuItemButton(
-        onPressed: onTap,
-        leadingIcon: SizedBox(
-          width: 20,
-          child: selected
-              ? const Icon(Icons.check, size: 18, color: ConeColors.accent)
-              : (icon != null
-                  ? Icon(icon, size: 18, color: ConeColors.textMuted)
-                  : null),
+    onPressed: onTap,
+    leadingIcon: SizedBox(
+      width: 20,
+      child: selected
+          ? const Icon(Icons.check, size: 18, color: ConeColors.accent)
+          : (icon != null
+                ? Icon(icon, size: 18, color: ConeColors.textMuted)
+                : null),
+    ),
+    trailingIcon: detail == null
+        ? null
+        : Text(
+            detail!,
+            style: const TextStyle(fontSize: 11, color: ConeColors.textMuted),
+          ),
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 200, maxWidth: 320),
+      child: Text(
+        label,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: selected ? ConeColors.accent : ConeColors.text,
+          fontSize: 13,
         ),
-        trailingIcon: detail == null
-            ? null
-            : Text(detail!,
-                style:
-                    const TextStyle(fontSize: 11, color: ConeColors.textMuted)),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 200, maxWidth: 320),
-          child: Text(label,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  color: selected ? ConeColors.accent : ConeColors.text,
-                  fontSize: 13)),
-        ),
-      );
+      ),
+    ),
+  );
 }
 
 final menuStyle = MenuStyle(
   backgroundColor: const WidgetStatePropertyAll(ConeColors.surface),
   side: const WidgetStatePropertyAll(BorderSide(color: ConeColors.border)),
-  shape: WidgetStatePropertyAll(RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(ConeRadius.lg))),
+  shape: WidgetStatePropertyAll(
+    RoundedRectangleBorder(borderRadius: BorderRadius.circular(ConeRadius.lg)),
+  ),
   padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 6)),
 );
+
+/// Tracks open menus so Escape can close them even though keyboard focus
+/// stays on the player.
+class OpenMenus {
+  static final Set<MenuController> _open = {};
+  static void opened(MenuController c) => _open.add(c);
+  static void closed(MenuController c) => _open.remove(c);
+
+  /// Closes every open menu; returns whether any was open.
+  static bool closeAll() {
+    if (_open.isEmpty) return false;
+    for (final c in _open.toList()) {
+      c.close();
+    }
+    _open.clear();
+    return true;
+  }
+}
+
+/// [MenuAnchor] that registers itself with [OpenMenus].
+class TrackedMenuAnchor extends StatefulWidget {
+  final List<Widget> menuChildren;
+  final MenuAnchorChildBuilder? builder;
+  final Widget? child;
+  final MenuController? controller;
+  final Offset? alignmentOffset;
+  const TrackedMenuAnchor({
+    super.key,
+    required this.menuChildren,
+    this.builder,
+    this.child,
+    this.controller,
+    this.alignmentOffset,
+  });
+
+  @override
+  State<TrackedMenuAnchor> createState() => _TrackedMenuAnchorState();
+}
+
+class _TrackedMenuAnchorState extends State<TrackedMenuAnchor> {
+  late final MenuController _ctrl = widget.controller ?? MenuController();
+
+  @override
+  void dispose() {
+    OpenMenus.closed(_ctrl);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => MenuAnchor(
+    controller: _ctrl,
+    style: menuStyle,
+    alignmentOffset: widget.alignmentOffset,
+    onOpen: () => OpenMenus.opened(_ctrl),
+    onClose: () => OpenMenus.closed(_ctrl),
+    menuChildren: widget.menuChildren,
+    builder: widget.builder,
+    child: widget.child,
+  );
+}
 
 /// Icon button that opens an anchored flyout on a single click.
 class FlyoutButton extends StatelessWidget {
@@ -86,17 +154,16 @@ class FlyoutButton extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => MenuAnchor(
-        style: menuStyle,
-        alignmentOffset: const Offset(0, 8),
-        menuChildren: builder(),
-        builder: (context, ctrl, _) => ControlIcon(
-          icon: icon,
-          tooltip: tooltip,
-          active: active || ctrl.isOpen,
-          onPressed: () => ctrl.isOpen ? ctrl.close() : ctrl.open(),
-        ),
-      );
+  Widget build(BuildContext context) => TrackedMenuAnchor(
+    alignmentOffset: const Offset(0, 8),
+    menuChildren: builder(),
+    builder: (context, ctrl, _) => ControlIcon(
+      icon: icon,
+      tooltip: tooltip,
+      active: active || ctrl.isOpen,
+      onPressed: () => ctrl.isOpen ? ctrl.close() : ctrl.open(),
+    ),
+  );
 }
 
 /// Monochrome control icon used across the bars.
@@ -117,19 +184,20 @@ class ControlIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: tooltip,
-        child: IconButton(
-          onPressed: onPressed,
-          iconSize: size,
-          color: active ? ConeColors.accent : ConeColors.text,
-          hoverColor: ConeColors.surfaceHigh,
-          style: IconButton.styleFrom(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(ConeRadius.md)),
-          ),
-          icon: Icon(icon),
+    message: tooltip,
+    child: IconButton(
+      onPressed: onPressed,
+      iconSize: size,
+      color: active ? ConeColors.accent : ConeColors.text,
+      hoverColor: ConeColors.surfaceHigh,
+      style: IconButton.styleFrom(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ConeRadius.md),
         ),
-      );
+      ),
+      icon: Icon(icon),
+    ),
+  );
 }
 
 String trackLabel({String? title, String? language, required String id}) {
@@ -144,8 +212,9 @@ List<Widget> subtitleFlyout({
   required Player player,
   required VoidCallback onLoadFile,
 }) {
-  final tracks =
-      player.state.tracks.subtitle.where((t) => t.id != 'auto').toList();
+  final tracks = player.state.tracks.subtitle
+      .where((t) => t.id != 'auto')
+      .toList();
   final current = player.state.track.subtitle;
   return [
     const FlyoutHeader('Subtitles'),
@@ -160,15 +229,17 @@ List<Widget> subtitleFlyout({
       ),
     const Divider(height: 10, color: ConeColors.border),
     FlyoutItem(
-        label: 'Load subtitle file…',
-        icon: Icons.file_open_outlined,
-        onTap: onLoadFile),
+      label: 'Load subtitle file…',
+      icon: Icons.file_open_outlined,
+      onTap: onLoadFile,
+    ),
   ];
 }
 
 List<Widget> audioFlyout({required Player player}) {
-  final tracks =
-      player.state.tracks.audio.where((t) => t.id != 'auto').toList();
+  final tracks = player.state.tracks.audio
+      .where((t) => t.id != 'auto')
+      .toList();
   final current = player.state.track.audio;
   final devices = player.state.audioDevices;
   final device = player.state.audioDevice;

@@ -10,7 +10,22 @@ flutter pub get
 flutter run -d macos     # or: -d windows / -d linux
 ```
 
-- macOS builds need full Xcode (not just Command Line Tools).
+- macOS builds need full Xcode (not just Command Line Tools) and CocoaPods
+  (`pod` on PATH; set `LANG=en_US.UTF-8`).
+- You can pass files or URLs on the command line:
+  `cone_player.app/Contents/MacOS/cone_player movie.mkv`.
+
+## Tests
+
+```bash
+flutter test                      # unit tests
+tool/run_integration_test.sh      # end-to-end: real playback, keys, menus
+```
+
+The end-to-end test plays `integration_test/fixtures/test-clip.mp4` (made by
+`tool/make_test_clip.swift`) and checks pause/OSD, seeking, bookmarks, speed,
+volume/mute, subtitle and audio flyouts, menus, Hide UI, the queue and
+replay-at-end.
 - Windows builds need Visual Studio 2022 with "Desktop development with C++".
 - Linux builds need: `sudo apt install clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev mpv`.
 

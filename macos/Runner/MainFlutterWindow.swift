@@ -3,7 +3,10 @@ import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
-    let flutterViewController = FlutterViewController()
+    // Forward command-line arguments (files/URLs to open) to Dart's main().
+    let project = FlutterDartProject()
+    project.dartEntrypointArguments = Array(CommandLine.arguments.dropFirst())
+    let flutterViewController = FlutterViewController(project: project)
     let windowFrame = self.frame
     self.contentViewController = flutterViewController
     self.setFrame(windowFrame, display: true)

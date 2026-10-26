@@ -25,6 +25,7 @@ ThemeData buildConeTheme() {
     scaffoldBackgroundColor: ConeColors.canvas,
     colorScheme: base.colorScheme.copyWith(
       primary: ConeColors.accent,
+      onPrimary: ConeColors.canvas,
       secondary: ConeColors.accent,
       surface: ConeColors.surface,
       onSurface: ConeColors.text,

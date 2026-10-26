@@ -74,8 +74,19 @@ class PlayerController extends ChangeNotifier {
   // ---- Transport --------------------------------------------------------
 
   Future<void> togglePlay([String? key]) async {
+    final s = player.state;
+    // mpv parks on the last frame at the end; Play should start over.
+    if (!s.playing &&
+        s.duration > Duration.zero &&
+        s.position >= s.duration - const Duration(milliseconds: 300)) {
+      await player.seek(Duration.zero);
+      await player.play();
+      notify('Replay', key);
+      return;
+    }
+    // Label from the state before toggling: mpv reports the change later.
+    notify(s.playing ? 'Pause' : 'Play', key);
     await player.playOrPause();
-    notify(player.state.playing ? 'Play' : 'Pause', key);
   }
 
   Future<void> seekBy(Duration d, [String? key]) async {
@@ -171,6 +182,10 @@ class PlayerController extends ChangeNotifier {
 
   Future<void> setAdjust(String prop, int value) async =>
       _prop(prop, '$value'); // brightness / contrast / saturation: -100..100
+
+  /// Raises subtitles above the bottom bar (mpv units: 720-line script res).
+  Future<void> liftSubtitles(bool lift) =>
+      _prop('sub-margin-y', lift ? '100' : '22');
 
   void toggleUi([String? key]) {
     uiHidden = !uiHidden;

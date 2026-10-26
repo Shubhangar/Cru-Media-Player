@@ -29,8 +29,10 @@ class _OsdState extends State<Osd> {
         _msg = m;
         _visible = true;
       });
-      _timer = Timer(const Duration(milliseconds: 1300),
-          () => mounted ? setState(() => _visible = false) : null);
+      _timer = Timer(
+        const Duration(milliseconds: 1300),
+        () => mounted ? setState(() => _visible = false) : null,
+      );
     });
   }
 
@@ -51,28 +53,38 @@ class _OsdState extends State<Osd> {
         child: m == null
             ? const SizedBox.shrink()
             : Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 9,
+                ),
                 decoration: BoxDecoration(
                   color: ConeColors.surface.withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(ConeRadius.md),
                   border: Border.all(color: ConeColors.border),
                 ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Container(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
                       width: 3,
                       height: 18,
                       margin: const EdgeInsets.only(right: 10),
-                      color: ConeColors.accent),
-                  Text(m.action,
+                      color: ConeColors.accent,
+                    ),
+                    Text(
+                      m.action,
                       style: const TextStyle(
-                          color: ConeColors.text,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600)),
-                  if (m.shortcut != null) ...[
-                    const SizedBox(width: 12),
-                    KeyChip(m.shortcut!),
+                        color: ConeColors.text,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (m.shortcut != null) ...[
+                      const SizedBox(width: 12),
+                      KeyChip(m.shortcut!),
+                    ],
                   ],
-                ]),
+                ),
               ),
       ),
     );
@@ -85,17 +97,20 @@ class KeyChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        decoration: BoxDecoration(
-          color: ConeColors.canvas,
-          borderRadius: BorderRadius.circular(ConeRadius.sm),
-          border: Border.all(color: ConeColors.border),
-        ),
-        child: Text(label,
-            style: const TextStyle(
-                color: ConeColors.accent,
-                fontSize: 12,
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.w600)),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(
+      color: ConeColors.canvas,
+      borderRadius: BorderRadius.circular(ConeRadius.sm),
+      border: Border.all(color: ConeColors.border),
+    ),
+    child: Text(
+      label,
+      style: const TextStyle(
+        color: ConeColors.accent,
+        fontSize: 12,
+        fontFamily: 'monospace',
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
 }
