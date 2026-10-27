@@ -1,10 +1,10 @@
-// Cone Player: adaptive sharpen.
+// Cru Media Player: adaptive sharpen.
 // Contrast-adaptive weights after AMD FidelityFX CAS (MIT): sharpens soft
 // detail while leaving already-crisp edges alone, so no halos.
 
 //!HOOK MAIN
 //!BIND HOOKED
-//!DESC Cone: adaptive sharpen
+//!DESC Cru: adaptive sharpen
 
 #define SHARPNESS 0.6
 

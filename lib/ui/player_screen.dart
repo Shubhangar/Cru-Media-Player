@@ -5,6 +5,9 @@ import 'dart:math' as math;
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+
+import 'blob_logo.dart';
+
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -1324,7 +1327,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.change_history_rounded, size: 72, color: ConeColors.accent),
+        const BlobLogo(size: 96, animated: true),
         const SizedBox(height: 14),
         const Text(
           'Drop media here',

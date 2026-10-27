@@ -92,7 +92,7 @@ class OpenSubtitlesClient {
 
   Map<String, String> get _headers => {
     'Api-Key': apiKey,
-    'User-Agent': 'ConePlayer v1.0',
+    'User-Agent': 'CruMediaPlayer v1.0',
     'Accept': 'application/json',
     'Content-Type': 'application/json',
   };

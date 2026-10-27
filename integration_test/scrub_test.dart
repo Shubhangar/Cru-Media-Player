@@ -59,7 +59,7 @@ void main() {
           controller: c,
           library: lib,
           previewer: previewer,
-          initialFiles: ['$fixtures/test-clip.mp4'],
+          initialFiles: [fixture('test-clip.mp4')],
         ),
       ),
     );
@@ -198,7 +198,7 @@ void main() {
 
     // --- Music: tall waveform scrubber -------------------------------------
     c.setOverlay(waveform: false);
-    await c.openAll(['$fixtures/test-song.m4a']);
+    await c.openAll([fixture('test-song.m4a')]);
     await waitFor(tester, () => c.isAudioOnly, what: 'music');
     await waitFor(
       tester,

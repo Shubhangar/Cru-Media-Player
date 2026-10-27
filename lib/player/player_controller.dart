@@ -68,7 +68,7 @@ class PlayerController extends ChangeNotifier {
     // libass: mpv draws subtitles into the video, so the Subtitles tab's
     // style (font, colours, outline, position, margin) is what you see.
     configuration: const PlayerConfiguration(
-      title: 'Cone Player',
+      title: 'Cru Media Player',
       logLevel: MPVLogLevel.warn,
       libass: true,
     ),
@@ -181,7 +181,7 @@ class PlayerController extends ChangeNotifier {
 
   String get title {
     final pl = player.state.playlist;
-    if (pl.medias.isEmpty) return 'Cone Player';
+    if (pl.medias.isEmpty) return 'Cru Media Player';
     final uri = pl.medias[pl.index.clamp(0, pl.medias.length - 1)].uri;
     final name = Uri.decodeComponent(uri.split(RegExp(r'[/\\]')).last);
     return name.isEmpty ? uri : name;
@@ -326,7 +326,7 @@ class PlayerController extends ChangeNotifier {
       'network-timeout': '${Prefs.netTimeout.of(s)}',
       'demuxer-max-bytes': '${Prefs.cacheMb.of(s)}MiB',
       'prefetch-playlist': Prefs.prefetch.of(s) ? 'yes' : 'no',
-      'user-agent': ua.isEmpty ? 'ConePlayer/1.0' : ua,
+      'user-agent': ua.isEmpty ? 'CruMediaPlayer/1.0' : ua,
       'loop-file': Prefs.repeat.of(s) == 'one' ? 'inf' : 'no',
       'loop-playlist': Prefs.repeat.of(s) == 'all' ? 'inf' : 'no',
       if (!sleepAtEnd) 'keep-open': Prefs.autoplayNext.of(s) ? 'yes' : 'always',
@@ -768,7 +768,7 @@ class PlayerController extends ChangeNotifier {
           Directory.systemTemp.path;
       folder =
           '$home${Platform.pathSeparator}Pictures'
-          '${Platform.pathSeparator}Cone Player';
+          '${Platform.pathSeparator}Cru Media Player';
     }
     await Directory(folder).create(recursive: true);
     final t = formatDuration(player.state.position).replaceAll(':', '-');

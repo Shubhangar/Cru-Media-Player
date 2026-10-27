@@ -57,7 +57,7 @@ void main() {
         settings: settings,
         library: lib,
         controller: c,
-        initialFiles: ['$fixtures/test-clip.mp4'],
+        initialFiles: [fixture('test-clip.mp4')],
       ),
     );
     await waitFor(tester, () => p.state.duration > Duration.zero, what: 'load');
@@ -68,7 +68,7 @@ void main() {
     Finder wiz(Finder f) =>
         find.descendant(of: find.byType(OnboardingWizard), matching: f);
     expect(find.byType(OnboardingWizard), findsOneWidget);
-    expect(find.text('Welcome to Cone Player'), findsOneWidget);
+    expect(find.text('Welcome to Cru Media Player'), findsOneWidget);
     await snap(tester, 'p5-1-welcome');
     await tester.tap(wiz(find.text('Get started')));
     await settle(tester);

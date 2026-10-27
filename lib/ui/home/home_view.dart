@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../blob_logo.dart';
+
 import '../../library/library_store.dart';
 import '../../theme.dart';
 import '../library/library_screen.dart' show LibrarySection;
@@ -118,14 +120,14 @@ class HomeView extends StatelessWidget {
 
   Widget _hero() => Row(
     children: [
-      Icon(Icons.change_history_rounded, size: 44, color: ConeColors.accent),
+      const BlobLogo(size: 52, animated: true),
       const SizedBox(width: 14),
       const Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Cone Player',
+              'Cru Media Player',
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w700,

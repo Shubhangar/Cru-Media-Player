@@ -444,7 +444,7 @@ class LibraryStore extends ChangeNotifier {
     }
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 15)
-      ..userAgent = 'ConePlayer/1.0';
+      ..userAgent = 'CruMediaPlayer/1.0';
     try {
       final req = await client.getUrl(uri);
       final res = await req.close().timeout(const Duration(seconds: 30));

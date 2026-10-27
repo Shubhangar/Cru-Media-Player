@@ -45,7 +45,7 @@ void main() {
   testWidgets('hub, capture, clipboard, convert, cast', (tester) async {
     MediaKit.ensureInitialized();
     await windowManager.ensureInitialized();
-    final clip = File('$fixtures/test-clip.mp4')
+    final clip = File(fixture('test-clip.mp4'))
         .copySync('${tmp.path}/Clip.mp4')
         .path;
 

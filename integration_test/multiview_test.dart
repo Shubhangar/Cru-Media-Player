@@ -36,7 +36,7 @@ void main() {
   testWidgets('feeds follow the master and can float', (tester) async {
     MediaKit.ensureInitialized();
     await windowManager.ensureInitialized();
-    final angle = File('$fixtures/test-clip.mp4')
+    final angle = File(fixture('test-clip.mp4'))
         .copySync('${tmp.path}/Angle B.mp4')
         .path;
     final lib = LibraryStore(Directory('${tmp.path}/store'));
@@ -54,7 +54,7 @@ void main() {
         home: PlayerScreen(
           controller: c,
           library: lib,
-          initialFiles: ['$fixtures/test-clip.mp4'],
+          initialFiles: [fixture('test-clip.mp4')],
         ),
       ),
     );

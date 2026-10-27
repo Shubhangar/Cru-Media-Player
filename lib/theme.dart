@@ -41,9 +41,9 @@ const canvasPalettes = [
   ),
 ];
 
-/// Accent choices (General › Accent). Cone orange is the identity colour.
+/// Accent choices (General › Accent). Cru orange is the identity colour.
 const accentChoices = <(String, Color)>[
-  ('Cone orange', Color(0xFFFF6600)),
+  ('Cru orange', Color(0xFFFF6600)),
   ('Amber', Color(0xFFFFB300)),
   ('Signal red', Color(0xFFE53935)),
   ('Lime', Color(0xFF9CCC65)),
@@ -51,7 +51,7 @@ const accentChoices = <(String, Color)>[
   ('Violet', Color(0xFFB388FF)),
 ];
 
-/// Cone Player colour system: charcoal canvas + traffic-cone orange accent.
+/// Cru Media Player colour system: charcoal canvas + traffic-cone orange accent.
 /// Canvas and accent can be switched at runtime via [apply].
 class ConeColors {
   static Color canvas = const Color(0xFF121212);

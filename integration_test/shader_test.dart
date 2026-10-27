@@ -61,7 +61,7 @@ vec4 hook() { return vec4(1.0, 0.0, 1.0, 1.0); }
         home: PlayerScreen(
           controller: c,
           library: lib,
-          initialFiles: ['$fixtures/test-clip.mp4'],
+          initialFiles: [fixture('test-clip.mp4')],
         ),
       ),
     );

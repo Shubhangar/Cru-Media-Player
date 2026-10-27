@@ -1,10 +1,10 @@
-// Cone Player: soften noise. A small edge-preserving (bilateral) blur:
+// Cru Media Player: soften noise. A small edge-preserving (bilateral) blur:
 // neighbours that look alike are averaged, edges stay sharp. Good for
 // grainy or heavily compressed video.
 
 //!HOOK MAIN
 //!BIND HOOKED
-//!DESC Cone: soften noise
+//!DESC Cru: soften noise
 
 #define SIMILARITY 60.0
 

@@ -1,4 +1,8 @@
-# Cone Player
+<p align="center"><img src="assets/brand/app_icon_256.png" width="128" alt="Cru Media Player logo"></p>
+
+# Cru Media Player
+
+A new media player.
 
 Cross-platform (macOS, Windows, Linux) video player built with Flutter on top of
 libmpv (via [media_kit](https://pub.dev/packages/media_kit)).
@@ -13,7 +17,7 @@ flutter run -d macos     # or: -d windows / -d linux
 - macOS builds need full Xcode (not just Command Line Tools) and CocoaPods
   (`pod` on PATH; set `LANG=en_US.UTF-8`).
 - You can pass files or URLs on the command line:
-  `cone_player.app/Contents/MacOS/cone_player movie.mkv`.
+  `"Cru Media Player.app/Contents/MacOS/Cru Media Player" movie.mkv`.
 
 ## Engine notes
 
@@ -27,6 +31,8 @@ flutter run -d macos     # or: -d windows / -d linux
   app (`lib/library/cover_art.dart`) rather than by mpv.
 - Its only audio filter is `equalizer` (no `volume`, `dynaudnorm`, …): the
   EQ's anti-clipping pre-gain is a very wide equalizer band.
+- App icons are generated from the blob mascot painter
+  (`lib/ui/blob_logo.dart`): `flutter test tool/icons/generate_icons_test.dart`.
 - Subtitles are rendered by mpv/libass (`libass: true`) so the Subtitles
   tab's styling is what you see; media_kit's Flutter subtitle overlay is off.
 

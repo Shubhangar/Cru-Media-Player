@@ -1,10 +1,10 @@
-// Cone Player: darken line art (for animation). Finds edges with a Sobel
+// Cru Media Player: darken line art (for animation). Finds edges with a Sobel
 // filter and deepens only the dark side of each edge, so outlines get
 // crisper without darkening flat colour.
 
 //!HOOK MAIN
 //!BIND HOOKED
-//!DESC Cone: darken line art
+//!DESC Cru: darken line art
 
 #define STRENGTH 0.55
 

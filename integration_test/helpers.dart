@@ -9,6 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 const fixtures = String.fromEnvironment('FIXTURES');
 
+/// Path of a fixture file with this OS's separator (Windows uses `\`).
+String fixture(String name) => '$fixtures${Platform.pathSeparator}$name';
+
 /// Optional: `--dart-define=SHOTS=<dir>` saves PNGs of the Flutter UI.
 const shots = String.fromEnvironment('SHOTS');
 final shotKey = GlobalKey();

@@ -23,6 +23,9 @@ import 'package:window_manager/window_manager.dart';
 
 const fixtures = String.fromEnvironment('FIXTURES');
 
+/// Path of a fixture file with this OS's separator (Windows uses `\`).
+String fixture(String name) => '$fixtures${Platform.pathSeparator}$name';
+
 /// Optional: `--dart-define=SHOTS=<dir>` saves PNGs of the Flutter UI
 /// (rendered in-process, so no OS screen-recording permission is needed;
 /// the video texture itself shows as black).
@@ -88,7 +91,7 @@ void main() {
         builder: (context, child) =>
             RepaintBoundary(key: shotKey, child: child),
         home: PlayerScreen(
-          initialFiles: ['$fixtures/test-clip.mp4'],
+          initialFiles: [fixture('test-clip.mp4')],
           controller: c,
         ),
       ),
@@ -254,7 +257,7 @@ void main() {
         builder: (context, child) =>
             RepaintBoundary(key: shotKey, child: child),
         home: PlayerScreen(
-          initialFiles: ['$fixtures/test-clip.mp4'],
+          initialFiles: [fixture('test-clip.mp4')],
           controller: c,
         ),
       ),

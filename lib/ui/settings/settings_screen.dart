@@ -615,13 +615,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'Browser identity',
         'Sent to web servers when streaming. Some services only accept '
             'certain browsers. Leave empty for the default.',
-        (_) => _text(Prefs.userAgent, 'ConePlayer/1.0'),
+        (_) => _text(Prefs.userAgent, 'CruMediaPlayer/1.0'),
         keys: [Prefs.userAgent.key],
       ),
       _Entry(
         'Screenshot folder',
         'Where S (or the menu) saves screenshots. (Recording)',
-        (_) => _folder(Prefs.shotFolder, 'Pictures/Cone Player'),
+        (_) => _folder(Prefs.shotFolder, 'Pictures/Cru Media Player'),
         keys: [Prefs.shotFolder.key],
       ),
       _Entry(

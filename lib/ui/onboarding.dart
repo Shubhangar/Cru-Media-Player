@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'blob_logo.dart';
+
 import '../player/settings_store.dart';
 import '../settings/prefs.dart';
 import '../theme.dart';
@@ -118,10 +120,10 @@ class _OnboardingWizardState extends State<OnboardingWizard> {
   Widget _welcome() => Column(
     mainAxisAlignment: MainAxisAlignment.center,
     children: [
-      Icon(Icons.change_history_rounded, size: 84, color: ConeColors.accent),
+      const BlobLogo(size: 110, animated: true),
       const SizedBox(height: 16),
       const Text(
-        'Welcome to Cone Player',
+        'Welcome to Cru Media Player',
         style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
       ),
       const SizedBox(height: 8),

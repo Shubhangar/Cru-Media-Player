@@ -8,6 +8,9 @@ import '../../library/m3u.dart';
 import '../../theme.dart';
 import 'media_widgets.dart';
 
+/// Folder separator of this OS (scanned paths use it; Windows uses `\`).
+final _sep = Platform.pathSeparator;
+
 enum LibrarySection { videos, music, streams, playlists, history }
 
 enum SortMode {
@@ -91,7 +94,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final f = widget.initialFolder;
     if (f != null) {
       final root = lib.folders
-          .where((r) => f == r.path || f.startsWith('${r.path}/'))
+          .where((r) => f == r.path || f.startsWith('${r.path}$_sep'))
           .firstOrNull;
       _section = root?.kind == FolderKind.music
           ? LibrarySection.music
@@ -279,10 +282,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
     ];
     if (_root != null && _path != null) {
       final parent = Directory(_root!).parent.path;
-      final rel = _path!.substring(parent.length + 1).split('/');
+      final rel = _path!.substring(parent.length + 1).split(_sep);
       var acc = parent;
       for (final seg in rel) {
-        acc = '$acc/$seg';
+        acc = '$acc$_sep$seg';
         final target = acc;
         crumbs.add((seg, () => setState(() => _path = target)));
       }
@@ -499,7 +502,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         return _empty(
           music ? Icons.library_music_outlined : Icons.video_library_outlined,
           'Your ${music ? 'music' : 'video'} library is empty',
-          'Add a folder and Cone Player will find all the '
+          'Add a folder and Cru Media Player will find all the '
               '${music ? 'songs' : 'videos'} inside it.',
           addButton,
         );
@@ -541,13 +544,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
         final subfolders = <String, int>{};
         final files = <MediaFile>[];
         for (final f in snap.data!) {
-          if (!f.path.startsWith('$here/')) continue;
+          if (!f.path.startsWith('$here$_sep')) continue;
           final rest = f.path.substring(here.length + 1);
-          final slash = rest.indexOf('/');
+          final slash = rest.indexOf(_sep);
           if (slash < 0) {
             files.add(f);
           } else {
-            final sub = '$here/${rest.substring(0, slash)}';
+            final sub = '$here$_sep${rest.substring(0, slash)}';
             subfolders[sub] = (subfolders[sub] ?? 0) + 1;
           }
         }
@@ -661,7 +664,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     VoidCallback? onRemove,
   }) {
     final name = path
-        .split('/')
+        .split(RegExp(r'[/\\]'))
         .lastWhere((s) => s.isNotEmpty, orElse: () => path);
     return Material(
       color: ConeColors.surface,

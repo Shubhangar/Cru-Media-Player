@@ -21,7 +21,7 @@ Future<void> main(List<String> args) async {
       size: Size(1280, 760),
       minimumSize: Size(480, 270),
       center: true,
-      title: 'Cone Player',
+      title: 'Cru Media Player',
       backgroundColor: ConeColors.canvas,
     ),
     () async {
@@ -111,7 +111,7 @@ class _ConePlayerAppState extends State<ConePlayerApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'Cone Player',
+    title: 'Cru Media Player',
     debugShowCheckedModeBanner: false,
     theme: buildConeTheme(),
     builder: _builder,

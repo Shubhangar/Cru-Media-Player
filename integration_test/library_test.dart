@@ -49,8 +49,8 @@ void main() {
     );
     Prefs.onboarded.set(c.settings, true);
     final p = c.player;
-    final clip = '$fixtures/test-clip.mp4';
-    final song = '$fixtures/test-song.m4a';
+    final clip = fixture('test-clip.mp4');
+    final song = fixture('test-song.m4a');
 
     await tester.binding.setSurfaceSize(const Size(1280, 760));
     await tester.pumpWidget(

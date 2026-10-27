@@ -36,7 +36,7 @@ void main() {
     MediaKit.ensureInitialized();
     await windowManager.ensureInitialized();
     // Work on a copy so downloads land in the temp folder, not the repo.
-    final clip = File('$fixtures/test-clip.mp4')
+    final clip = File(fixture('test-clip.mp4'))
         .copySync('${tmp.path}/Clip.mp4')
         .path;
     File('${tmp.path}/Clip.fr.srt')
