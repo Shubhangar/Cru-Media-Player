@@ -66,7 +66,16 @@ void main() {
     // the engine directly for the file and the UI for everything else.
     final screen = tester.state(find.byType(PlayerScreen));
     final mv = (screen as dynamic).debugMultiView as MultiView;
-    await mv.addFeed(angle);
+    // Pump while adding: the feed's tile must mount before media opens.
+    final adding = mv.addFeed(angle);
+    await waitFor(
+      tester,
+      () =>
+          mv.feeds.isNotEmpty &&
+          mv.feeds.single.player.state.duration > Duration.zero,
+      what: 'feed opened',
+    );
+    await adding;
     await settle(tester, 800);
     expect(find.byType(MultiViewGrid), findsOneWidget);
     expect(find.text('Angle B.mp4'), findsOneWidget);

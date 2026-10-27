@@ -72,6 +72,7 @@ Windows and Linux binaries must be built on those systems (or in CI).
 | Ctrl/⌘ + W | Close media (back to Home) |
 | Ctrl/⌘ + , | Settings |
 | S | Screenshot |
+| Ctrl/⌘ + G | Multi-view (Esc floats the feeds) |
 | Enter / Esc | Accept / dismiss the resume prompt |
 
 ## Mouse & trackpad
@@ -128,5 +129,7 @@ Windows and Linux binaries must be built on those systems (or in CI).
    - GPU shaders: built-in sharpen / line-art / denoise, your own GLSL
      folder, one-click Anime4K (modes A/B/C) and FSR chains when present.
    - Screenshots (S) to a chosen folder as PNG or JPEG.
-   - Multi-window sync grid: (next).
+   - Multi-view (⌘G): up to 3 extra feeds in a grid or as floating
+     mini-windows, locked to the main video (play/pause, speed, seeks),
+     with per-feed time offset and a choice of which one you hear.
 6. Convert, capture device, cast.

@@ -92,10 +92,13 @@ class MultiView extends ChangeNotifier {
       Offset(24.0 + feeds.length * 30, 80.0 + feeds.length * 30),
     );
     feeds.add(f);
-    await f.player.setVolume(0);
-    await f.player.open(Media(uri), play: false);
+    // Mount the tile first: with a VideoController attached, the player's
+    // calls wait until a Video widget has created the render surface.
     if (mode == MultiMode.off) setMode(MultiMode.grid);
     notifyListeners();
+    await WidgetsBinding.instance.endOfFrame;
+    await f.player.setVolume(0);
+    await f.player.open(Media(uri), play: false);
     await _syncFeed(f, force: true);
   }
 
