@@ -9,6 +9,10 @@ import shutil
 import subprocess
 import sys
 
+# Windows consoles default to a legacy code page; Flutter prints box-drawing
+# characters that would crash plain print().
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 label, cmd = sys.argv[1], sys.argv[2:]
 cmd[0] = shutil.which(cmd[0]) or cmd[0]  # flutter is flutter.bat on Windows
 proc = subprocess.Popen(
