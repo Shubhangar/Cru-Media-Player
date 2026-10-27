@@ -422,7 +422,7 @@ class LibraryStore extends ChangeNotifier {
   Future<void> refreshSource(StreamSource s) async {
     try {
       final text = await _fetchText(s.url);
-      s.channels = parseM3u(text, base: Uri.tryParse(s.url));
+      s.channels = parseM3u(text, base: playlistBase(s.url));
       s.fetchedAt = DateTime.now();
       s.error = s.channels.isEmpty ? 'No channels found' : null;
     } catch (e) {
@@ -438,6 +438,7 @@ class LibraryStore extends ChangeNotifier {
   }
 
   static Future<String> _fetchText(String url) async {
+    if (isLocalPath(url)) return File(url).readAsString();
     final uri = Uri.parse(url);
     if (!uri.hasScheme || uri.scheme == 'file') {
       return File(uri.hasScheme ? uri.toFilePath() : url).readAsString();

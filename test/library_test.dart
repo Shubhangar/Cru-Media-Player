@@ -25,6 +25,23 @@ plain-three.mp4
       expect(c[2].group, '');
     });
 
+    test('local playlists: absolute entries kept, relative ones resolved', () {
+      final c = parseM3u(
+        '/media/a.mp4\nsub/b.mp4\nC:\\TV\\c.mp4\n',
+        base: playlistBase('/media/lists/tv.m3u'),
+      );
+      expect(c.map((e) => e.url), [
+        '/media/a.mp4',
+        '/media/lists/sub/b.mp4',
+        r'C:\TV\c.mp4',
+      ]);
+      expect(isLocalPath(r'D:\a\tv.m3u'), isTrue);
+      expect(isLocalPath('D:/a/tv.m3u'), isTrue);
+      expect(isLocalPath(r'\\nas\tv.m3u'), isTrue);
+      expect(isLocalPath('http://x/tv.m3u'), isFalse);
+      expect(playlistBase(r'D:\a\tv.m3u')!.scheme, 'file');
+    });
+
     test('comma inside quoted attribute is not the name separator', () {
       final c = parseM3u('#EXTINF:-1 group-title="A, B",Name\nhttp://h/x');
       expect(c.single.name, 'Name');

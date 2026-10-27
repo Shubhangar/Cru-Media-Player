@@ -28,6 +28,18 @@ class Channel {
 
 final _attr = RegExp(r'([\w-]+)="([^"]*)"');
 
+/// An absolute local path: POSIX, a Windows drive (`C:\` or `C:/`) or UNC.
+/// (`Uri.parse` would read `C:\x` as a URL with the scheme `c`.)
+bool isLocalPath(String s) =>
+    s.startsWith('/') ||
+    s.startsWith(r'\\') ||
+    RegExp(r'^[A-Za-z]:[\\/]').hasMatch(s);
+
+/// What relative entries of the playlist at [location] resolve against.
+Uri? playlistBase(String location) => isLocalPath(location)
+    ? Uri.file(location, windows: !location.startsWith('/'))
+    : Uri.tryParse(location);
+
 /// Parses extended M3U (`#EXTINF:-1 tvg-logo="…" group-title="…",Name`)
 /// as well as plain lists of URLs. Relative entries resolve against [base].
 List<Channel> parseM3u(String text, {Uri? base}) {
@@ -54,9 +66,14 @@ List<Channel> parseM3u(String text, {Uri? base}) {
       continue;
     }
     if (line.startsWith('#')) continue;
-    final url = base != null && !line.contains('://')
-        ? base.resolve(line).toString()
-        : line;
+    final String url;
+    if (base == null || line.contains('://') || isLocalPath(line)) {
+      url = line;
+    } else if (base.scheme == 'file') {
+      url = base.resolve(line.replaceAll(r'\', '/')).toFilePath();
+    } else {
+      url = base.resolve(line).toString();
+    }
     out.add(
       Channel(
         name: (name == null || name.isEmpty) ? _nameFromUrl(url) : name,
