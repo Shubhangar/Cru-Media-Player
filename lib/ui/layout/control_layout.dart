@@ -25,6 +25,7 @@ enum ControlId {
   audio('Audio', Icons.graphic_eq),
   inspector('Inspector', Icons.tune),
   library('Library', Icons.video_library_outlined),
+  cast('Cast', Icons.cast),
   volume('Volume', Icons.volume_up_outlined);
 
   final String label;

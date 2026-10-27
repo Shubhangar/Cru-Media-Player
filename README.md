@@ -73,6 +73,7 @@ Windows and Linux binaries must be built on those systems (or in CI).
 | Ctrl/⌘ + , | Settings |
 | S | Screenshot |
 | Ctrl/⌘ + G | Multi-view (Esc floats the feeds) |
+| Ctrl/⌘ + T | Open & tools |
 | Enter / Esc | Accept / dismiss the resume prompt |
 
 ## Mouse & trackpad
@@ -132,4 +133,13 @@ Windows and Linux binaries must be built on those systems (or in CI).
    - Multi-view (⌘G): up to 3 extra feeds in a grid or as floating
      mini-windows, locked to the main video (play/pause, speed, seeks),
      with per-feed time offset and a choice of which one you hear.
-6. Convert, capture device, cast.
+6. ✅ Open & tools (⌘T): one hub for Open file / folder / network stream /
+   capture device / clipboard / convert / cast.
+   - Capture: live network sources (RTSP, SRT, RTMP, UDP, HTTP/MJPEG) with
+     a low-latency mode. Built-in webcams/capture cards need the engine's
+     device demuxers, which the bundled ffmpeg lacks.
+   - Convert: MP4 1080p/720p, HEVC, audio-only via macOS `avconvert`
+     (built in) or `ffmpeg` if installed; progress and cancel.
+   - Cast: DLNA/UPnP renderers (TVs, speakers): network search, add by
+     address, local files streamed from a built-in server with seeking;
+     a top-bar pill controls the TV. (Chromecast/AirPlay not included.)

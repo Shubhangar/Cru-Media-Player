@@ -780,6 +780,17 @@ class PlayerController extends ChangeNotifier {
     return path;
   }
 
+  /// Opens a live capture source with mpv's low-latency profile.
+  Future<void> openCapture(String url, {bool lowLatency = true}) async {
+    if (lowLatency) {
+      try {
+        await _mpv?.command(['apply-profile', 'low-latency']);
+      } catch (_) {}
+    }
+    await openAll([url]);
+    notify(lowLatency ? 'Live source · low latency' : 'Live source');
+  }
+
   /// Title / artist / album tags of the current file.
   Future<Map<String, String>> trackTags() async =>
       parseTags(await _get('metadata'));

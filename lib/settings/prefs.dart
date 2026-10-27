@@ -74,4 +74,9 @@ abstract final class Prefs {
   static const shotFormat = Pref('shotFormat', 'png'); // png|jpeg
   static const shaderFolder = Pref('shaderFolder', '');
   static const activeShaders = Pref('activeShaders', ''); // ;-joined paths
+  static const captureSources = Pref('captureSources', ''); // ;-joined URLs
+  static const castDevices = Pref(
+    'castDevices',
+    '',
+  ); // ;-joined description URLs
 }

@@ -33,6 +33,8 @@ import 'layout/control_layout.dart';
 import 'layout/layout_editor.dart';
 import 'onboarding.dart';
 import 'multiview_view.dart';
+import 'tools/tools_dialogs.dart';
+import '../tools/cast_session.dart';
 import '../player/multiview.dart';
 import '../player/settings_store.dart';
 import '../settings/prefs.dart';
@@ -76,6 +78,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       );
   late final _previewer = widget.previewer ?? FramePreviewer();
   late final _multi = MultiView(p);
+  final _cast = CastSession();
+
+  @visibleForTesting
+  CastSession get debugCast => _cast;
 
   @visibleForTesting
   MultiView get debugMultiView => _multi;
@@ -205,6 +211,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _s.addListener(_onPrefs);
     _onPrefs();
     _multi.addListener(() => mounted ? setState(() {}) : null);
+    _cast.addListener(() => mounted ? setState(() {}) : null);
     c.init().then((_) {
       if (widget.initialFiles.isNotEmpty) c.openAll(widget.initialFiles);
     });
@@ -221,6 +228,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     c.dispose();
     _previewer.dispose();
     _multi.dispose();
+    _cast.dispose();
     _focus.dispose();
     super.dispose();
   }
@@ -368,6 +376,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
         }
       } else if (k == LogicalKeyboardKey.keyI) {
         _toggleInspector();
+      } else if (k == LogicalKeyboardKey.keyT) {
+        showMediaHub(context, c, loader, _cast);
       } else if (k == LogicalKeyboardKey.keyG && _hasMedia) {
         _multi.mode == MultiMode.grid
             ? _multi.setMode(MultiMode.floating)
@@ -911,6 +921,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
             alignmentOffset: const Offset(0, 6),
             menuChildren: [
               FlyoutItem(
+                label: 'Open & tools…',
+                detail: '$_mod+T',
+                icon: Icons.apps,
+                onTap: () => showMediaHub(context, c, loader, _cast),
+              ),
+              const Divider(height: 10),
+              FlyoutItem(
                 label: 'Open file…',
                 detail: '$_mod+O',
                 icon: Icons.insert_drive_file_outlined,
@@ -955,6 +972,23 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   icon: Icons.video_library_outlined,
                   onTap: _openLibrary,
                 ),
+              FlyoutItem(
+                label: 'Capture device…',
+                icon: Icons.videocam_outlined,
+                onTap: () => showCaptureDialog(context, c),
+              ),
+              if (_hasMedia) ...[
+                FlyoutItem(
+                  label: 'Convert…',
+                  icon: Icons.transform,
+                  onTap: () => showConvertDialog(context, c),
+                ),
+                FlyoutItem(
+                  label: 'Cast…',
+                  icon: Icons.cast,
+                  onTap: () => showCastDialog(context, c, _cast),
+                ),
+              ],
               if (_hasMedia)
                 FlyoutItem(
                   label: 'Multi-view',
@@ -1000,6 +1034,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
               ),
             ),
           ),
+          CastPill(cast: _cast),
+          const SizedBox(width: 8),
           if (_lib != null)
             ControlIcon(
               icon: Icons.video_library_outlined,
@@ -1202,6 +1238,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
           tooltip: 'Library ($_mod+Shift+L)',
           onPressed: _openLibrary,
         ),
+    ],
+    ControlId.cast => [
+      ControlIcon(
+        icon: _cast.active ? Icons.cast_connected : Icons.cast,
+        tooltip: 'Cast to TV',
+        active: _cast.active,
+        onPressed: () => showCastDialog(context, c, _cast),
+      ),
     ],
     ControlId.volume => [
       const SizedBox(width: 6),
