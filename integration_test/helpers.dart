@@ -12,6 +12,11 @@ const fixtures = String.fromEnvironment('FIXTURES');
 /// Path of a fixture file with this OS's separator (Windows uses `\`).
 String fixture(String name) => '$fixtures${Platform.pathSeparator}$name';
 
+/// `--dart-define=NO_GPU=true` on machines that only have software OpenGL
+/// (CI): media_kit then renders video in software, which skips mpv's GLSL
+/// shaders, so pixel checks of shader output are skipped.
+const noGpu = bool.fromEnvironment('NO_GPU');
+
 /// Optional: `--dart-define=SHOTS=<dir>` saves PNGs of the Flutter UI.
 const shots = String.fromEnvironment('SHOTS');
 final shotKey = GlobalKey();

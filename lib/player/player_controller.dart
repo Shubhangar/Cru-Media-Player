@@ -362,6 +362,9 @@ class PlayerController extends ChangeNotifier {
     } catch (e) {
       debugPrint('shaders: $e');
     }
+    // Without a usable sound device, keep playing (silently) rather than
+    // dropping audio — which would leave audio-only files with nothing to play.
+    await _prop('audio-fallback-to-null', 'yes');
     await _applyPrefs();
     settings.addListener(_applyPrefs);
     adjust = adjust.copyWith(
@@ -460,8 +463,14 @@ class PlayerController extends ChangeNotifier {
     if (DateTime.now().difference(_lastSaved) > const Duration(seconds: 5)) {
       _recordProgress();
     }
-    // Card frame: refreshed at most once a minute so "Continue watching"
-    // shows roughly where you stopped. Needs the history entry to exist.
+    _maybeThumb(uri);
+  }
+
+  /// Card frame: refreshed at most once a minute so "Continue watching"
+  /// shows roughly where you stopped. Needs the history entry to exist, so
+  /// it is also tried right after progress is saved (a short clip can end
+  /// before the next position update).
+  void _maybeThumb(String uri) {
     final due =
         _lastThumb == null ||
         DateTime.now().difference(_lastThumb!) > const Duration(minutes: 1);
@@ -489,6 +498,7 @@ class PlayerController extends ChangeNotifier {
       duration: dur,
       isAudio: isAudioOnly,
     );
+    _maybeThumb(uri);
   }
 
   Future<void> acceptResume() async {

@@ -106,7 +106,14 @@ vec4 hook() { return vec4(1.0, 0.0, 1.0, 1.0); }
     await p.seek(const Duration(seconds: 1));
     await settle(tester, 900);
     final after = await countPixels(tester, magenta);
-    expect(after, greaterThan(before + 50000), reason: 'shader must render');
+    expect(
+      await mpv.getProperty('glsl-shaders'),
+      contains('FSR.glsl'),
+      reason: 'preset applied',
+    );
+    if (!noGpu) {
+      expect(after, greaterThan(before + 50000), reason: 'shader must render');
+    }
     await snap(tester, 'p5-8-shader');
 
     await tester.tap(

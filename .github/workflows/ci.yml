@@ -64,14 +64,11 @@ jobs:
           status=0
           for f in integration_test/*_test.dart; do
             echo "::group::$f"
-            if ! xvfb-run -a -s "-screen 0 1920x1080x24" \
+            python3 tool/ci_test.py "linux $f" \
+              xvfb-run -a -s "-screen 0 1920x1080x24" \
               flutter test "$f" -d linux \
               --dart-define=FIXTURES="$PWD/integration_test/fixtures" \
-              > test.log 2>&1; then
-              status=1
-              python3 tool/ci_report.py "linux $f" test.log
-            fi
-            cat test.log
+              --dart-define=NO_GPU=true || status=1
             echo "::endgroup::"
           done
           exit $status
@@ -101,14 +98,10 @@ jobs:
           $status = 0
           foreach ($f in Get-ChildItem integration_test -Filter *_test.dart) {
             Write-Output "::group::$($f.Name)"
-            flutter test "integration_test/$($f.Name)" -d windows `
-              --dart-define=FIXTURES="$env:GITHUB_WORKSPACE\integration_test\fixtures" `
-              *> test.log
-            if ($LASTEXITCODE -ne 0) {
-              $status = 1
-              python tool/ci_report.py "windows $($f.Name)" test.log
-            }
-            Get-Content test.log
+            python tool/ci_test.py "windows $($f.Name)" `
+              flutter test "integration_test/$($f.Name)" -d windows `
+              --dart-define=FIXTURES="$env:GITHUB_WORKSPACE\integration_test\fixtures"
+            if ($LASTEXITCODE -ne 0) { $status = 1 }
             Write-Output "::endgroup::"
           }
           exit $status
