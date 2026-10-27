@@ -721,6 +721,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				CRU_HANDLER_RANK = None;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.crumediaplayer.app.debug;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;

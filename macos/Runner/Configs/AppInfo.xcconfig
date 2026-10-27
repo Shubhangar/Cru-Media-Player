@@ -12,3 +12,7 @@ PRODUCT_BUNDLE_IDENTIFIER = dev.crumediaplayer.app
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 Cru Media Player. All rights reserved.
+
+// How Finder offers this app for media files ("Open With"). Debug builds
+// (test harnesses) override this with None.
+CRU_HANDLER_RANK = Alternate

@@ -389,7 +389,13 @@ class PlayerController extends ChangeNotifier {
     if (audioLanguages.isNotEmpty) await _prop('alang', audioLanguages);
     if (subtitleLanguages.isNotEmpty) await _prop('slang', subtitleLanguages);
     _completedSub = player.stream.completed.listen((done) {
-      if (done) _recordProgress(finished: true);
+      if (done) {
+        _recordProgress(finished: true);
+        // A short clip can end before its first periodic save created the
+        // history entry; the last frame is still on screen here.
+        final uri = _trackedUri;
+        if (uri != null && !_disposed) _maybeThumb(uri);
+      }
       if (done && sleepAtEnd) _finishSleep();
     });
     _waveSubs = [
@@ -467,9 +473,7 @@ class PlayerController extends ChangeNotifier {
   }
 
   /// Card frame: refreshed at most once a minute so "Continue watching"
-  /// shows roughly where you stopped. Needs the history entry to exist, so
-  /// it is also tried right after progress is saved (a short clip can end
-  /// before the next position update).
+  /// shows roughly where you stopped. Needs the history entry to exist.
   void _maybeThumb(String uri) {
     final due =
         _lastThumb == null ||
@@ -498,7 +502,6 @@ class PlayerController extends ChangeNotifier {
       duration: dur,
       isAudio: isAudioOnly,
     );
-    _maybeThumb(uri);
   }
 
   Future<void> acceptResume() async {
@@ -815,8 +818,11 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     _recordProgress();
     library?.save();
     for (final sub in [...?_historySubs, ...?_waveSubs]) {
