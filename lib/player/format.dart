@@ -84,3 +84,19 @@ String nativeMediaPath(String uri, {bool? windows}) {
   }
   return uri;
 }
+
+/// Last path component of a file path or URL, for display. URL escapes are
+/// decoded leniently (a stray `%` must not throw); local file names are shown
+/// exactly as they are on disk.
+String fileNameOf(String uri) {
+  final last = uri
+      .split(RegExp(r'[/\\]'))
+      .lastWhere((s) => s.isNotEmpty, orElse: () => uri);
+  if (!uri.contains('://')) return last;
+  final noQuery = last.split('?').first;
+  try {
+    return Uri.decodeComponent(noQuery);
+  } on ArgumentError {
+    return noQuery;
+  }
+}

@@ -19,7 +19,7 @@ import '../player/media_loader.dart';
 import '../player/waveform.dart';
 import '../player/player_controller.dart';
 import '../theme.dart';
-import 'cone_volume.dart';
+import 'volume_slider.dart';
 import 'flyouts.dart';
 import 'osd.dart';
 import 'home/home_view.dart';
@@ -189,6 +189,52 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _pip = false;
   Rect? _boundsBeforePip;
   double _brightness = 0; // accumulates small gesture deltas
+
+  // Two-finger trackpad swipes lock to one axis once they have moved a few
+  // pixels: horizontal scrubs, vertical adjusts brightness / volume.
+  Offset _panTotal = Offset.zero;
+  Axis? _panAxis;
+  Duration? _scrubBase, _scrubTarget;
+  DateTime _lastScrubSeek = DateTime(0);
+
+  void _panStart() {
+    _panTotal = Offset.zero;
+    _panAxis = null;
+    _scrubBase = _scrubTarget = null;
+  }
+
+  /// A full-width swipe covers a quarter of the file (30 s to 5 min);
+  /// fingers moving right go forward.
+  void _scrub(double dx, double width) {
+    final dur = p.state.duration;
+    if (!_hasMedia || dur <= Duration.zero || width <= 0) return;
+    final base = _scrubBase ??= p.state.position;
+    final spanMs = (dur.inMilliseconds / 4).clamp(30000, 300000);
+    final ms = (base.inMilliseconds + spanMs * dx / width).clamp(
+      0,
+      dur.inMilliseconds,
+    );
+    final target = Duration(milliseconds: ms.round());
+    _scrubTarget = target;
+    final delta = target - base;
+    c.notify(
+      '${formatDuration(target)}  '
+          '(${delta.isNegative ? '−' : '+'}${formatDuration(delta.abs())})',
+      'Swipe',
+    );
+    final now = DateTime.now();
+    if (now.difference(_lastScrubSeek) > const Duration(milliseconds: 60)) {
+      _lastScrubSeek = now;
+      p.seek(target);
+    }
+  }
+
+  void _panEnd() {
+    final t = _scrubTarget;
+    if (t != null) p.seek(t);
+    _panStart();
+  }
+
   bool _dragging = false;
   int _subMargin = -1;
 
@@ -790,7 +836,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
       menuChildren: _contextMenuItems(),
       child: Listener(
         onPointerSignal: (e) {
-          if (e is PointerScrollEvent) {
+          if (e is PointerScrollEvent &&
+              e.scrollDelta.dx.abs() > e.scrollDelta.dy.abs()) {
+            // Horizontal wheel (tilt wheels, Magic Mouse): seek.
+            c.seekBy(
+              Duration(seconds: e.scrollDelta.dx > 0 ? 5 : -5),
+              'Scroll',
+            );
+          } else if (e is PointerScrollEvent) {
             switch (Prefs.wheel.of(_s)) {
               case 'volume':
                 c.setVolume(
@@ -805,14 +858,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
             }
           }
         },
-        // Trackpad: two-finger vertical swipe & pinch.
+        // Trackpad: pinch zooms; two-finger swipes scrub (horizontal) or
+        // adjust brightness / volume (vertical, left / right half).
+        onPointerPanZoomStart: (_) => _panStart(),
         onPointerPanZoomUpdate: (e) {
           if ((e.scale - 1).abs() > 0.02) {
             c.setZoom(c.adjust.zoom + (e.scale - 1) * 0.05);
-          } else if (e.panDelta.dy.abs() > e.panDelta.dx.abs()) {
-            _sideAdjust(e.localPosition.dx, box.maxWidth, e.panDelta.dy);
+            return;
+          }
+          _panTotal += e.panDelta;
+          _panAxis ??= _panTotal.distance < 6
+              ? null
+              : _panTotal.dx.abs() > _panTotal.dy.abs()
+              ? Axis.horizontal
+              : Axis.vertical;
+          switch (_panAxis) {
+            case Axis.horizontal:
+              _scrub(_panTotal.dx, box.maxWidth);
+            case Axis.vertical:
+              _sideAdjust(e.localPosition.dx, box.maxWidth, e.panDelta.dy);
+            case null:
+              break;
           }
         },
+        onPointerPanZoomEnd: (_) => _panEnd(),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
@@ -1231,6 +1300,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             p.state.track.subtitle.id != 'no' &&
             p.state.track.subtitle.id != 'auto',
         builder: () => subtitleFlyout(
+          playingId: c.playingSubId,
           player: p,
           onLoadFile: loader.openSubtitle,
           onFind: () => showSubtitleLoader(context, c),
@@ -1241,7 +1311,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       FlyoutButton(
         icon: Icons.graphic_eq,
         tooltip: 'Audio tracks & output',
-        builder: () => audioFlyout(player: p),
+        builder: () => audioFlyout(player: p, playingId: c.playingAudioId),
       ),
     ],
     ControlId.inspector => [
@@ -1269,8 +1339,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       ),
     ],
     ControlId.volume => [
-      const SizedBox(width: 6),
-      ConeVolume(
+      const SizedBox(width: 4),
+      VolumeSlider(
         volume: p.state.volume,
         onChanged: (v) => c.setVolume(v),
         onToggleMute: () => c.toggleMute(),

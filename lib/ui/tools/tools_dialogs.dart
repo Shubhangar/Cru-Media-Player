@@ -13,8 +13,9 @@ import '../../tools/cast_session.dart';
 import '../../tools/converter.dart';
 import '../../tools/dlna.dart';
 import '../inspector/widgets.dart';
+import '../../player/format.dart';
 
-String _name(String p) => Uri.decodeComponent(p.split(RegExp(r'[/\\]')).last);
+String _name(String p) => fileNameOf(p);
 
 /// Shared frame for the utility dialogs.
 class _ToolDialog extends StatelessWidget {

@@ -208,15 +208,21 @@ String trackLabel({String? title, String? language, required String id}) {
   return parts.isEmpty ? 'Track $id' : parts.join(' · ');
 }
 
+/// The id a menu should mark: the explicit choice, or (while the choice is
+/// "auto") the track mpv actually picked.
+String _effective(String chosen, String? playing) =>
+    chosen == 'auto' ? (playing ?? chosen) : chosen;
+
 List<Widget> subtitleFlyout({
   required Player player,
+  String? playingId,
   required VoidCallback onLoadFile,
   VoidCallback? onFind,
 }) {
   final tracks = player.state.tracks.subtitle
       .where((t) => t.id != 'auto')
       .toList();
-  final current = player.state.track.subtitle;
+  final current = _effective(player.state.track.subtitle.id, playingId);
   return [
     const FlyoutHeader('Subtitles'),
     for (final t in tracks)
@@ -225,7 +231,7 @@ List<Widget> subtitleFlyout({
             ? 'Off'
             : trackLabel(title: t.title, language: t.language, id: t.id),
         detail: t.codec,
-        selected: t.id == current.id,
+        selected: t.id == current,
         onTap: () => player.setSubtitleTrack(t),
       ),
     Divider(height: 10, color: ConeColors.border),
@@ -244,11 +250,11 @@ List<Widget> subtitleFlyout({
   ];
 }
 
-List<Widget> audioFlyout({required Player player}) {
+List<Widget> audioFlyout({required Player player, String? playingId}) {
   final tracks = player.state.tracks.audio
       .where((t) => t.id != 'auto')
       .toList();
-  final current = player.state.track.audio;
+  final current = _effective(player.state.track.audio.id, playingId);
   final devices = player.state.audioDevices;
   final device = player.state.audioDevice;
   return [
@@ -262,7 +268,7 @@ List<Widget> audioFlyout({required Player player}) {
           if (t.codec != null) t.codec!,
           if (t.channels != null) t.channels!,
         ].join(' '),
-        selected: t.id == current.id,
+        selected: t.id == current,
         onTap: () => player.setAudioTrack(t),
       ),
     Divider(height: 10, color: ConeColors.border),

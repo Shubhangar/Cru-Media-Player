@@ -216,7 +216,19 @@ void main() {
     );
     await settle(tester, 400);
     expect(find.text('test-clip.mp4'), findsWidgets);
+    // Names with a stray % used to throw while building the list (grey box).
+    final odd = File(fixture('test-clip.mp4')).copySync(
+      '${Directory.systemTemp.createTempSync('cru_q').path}'
+      '${Platform.pathSeparator}50% off.mp4',
+    );
+    await c.openAll([odd.path, fixture('test-clip.mp4')], append: true);
+    await settle(tester, 400);
+    expect(find.text('50% off.mp4'), findsOneWidget);
+    expect(tester.takeException(), isNull);
     await snap(tester, '6-queue');
+    await p.remove(2);
+    await p.remove(1);
+    await settle(tester);
 
     // --- End of file: Space replays from the start ------------------------
     await p.seek(p.state.duration - const Duration(milliseconds: 500));

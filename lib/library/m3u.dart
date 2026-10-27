@@ -1,3 +1,5 @@
+import '../player/format.dart';
+
 /// One entry of an M3U / M3U8 (IPTV) playlist.
 class Channel {
   final String name;
@@ -98,6 +100,6 @@ int _lastUnquotedComma(String s) {
 }
 
 String _nameFromUrl(String url) {
-  final seg = Uri.tryParse(url)?.pathSegments.where((s) => s.isNotEmpty);
-  return seg == null || seg.isEmpty ? url : Uri.decodeComponent(seg.last);
+  final name = fileNameOf(url);
+  return name.isEmpty ? url : name;
 }

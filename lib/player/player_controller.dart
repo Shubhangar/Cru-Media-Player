@@ -183,7 +183,7 @@ class PlayerController extends ChangeNotifier {
     final pl = player.state.playlist;
     if (pl.medias.isEmpty) return 'Cru Media Player';
     final uri = pl.medias[pl.index.clamp(0, pl.medias.length - 1)].uri;
-    final name = Uri.decodeComponent(uri.split(RegExp(r'[/\\]')).last);
+    final name = fileNameOf(uri);
     return name.isEmpty ? uri : name;
   }
 
@@ -251,6 +251,23 @@ class PlayerController extends ChangeNotifier {
     r = double.parse(r.clamp(0.25, 4.0).toStringAsFixed(2));
     await player.setRate(r);
     notify('Speed ${r}x', key);
+  }
+
+  // ---- Tracks -----------------------------------------------------------
+
+  /// Ids of the audio / subtitle tracks actually playing. While the selection
+  /// is "auto", mpv picks one itself; menus mark that one as selected.
+  String? playingAudioId, playingSubId;
+
+  Future<void> _refreshActiveTracks() async {
+    final a = await _get('current-tracks/audio/id');
+    final sub = await _get('current-tracks/sub/id');
+    final audio = a.isEmpty ? 'no' : a;
+    final subs = sub.isEmpty ? 'no' : sub;
+    if (audio == playingAudioId && subs == playingSubId) return;
+    playingAudioId = audio;
+    playingSubId = subs;
+    if (!_disposed) notifyListeners();
   }
 
   // ---- Bookmarks --------------------------------------------------------
@@ -404,6 +421,8 @@ class PlayerController extends ChangeNotifier {
       player.stream.track.listen((_) => refreshCues()),
       player.stream.duration.listen((_) => refreshCues()),
       player.stream.duration.listen((_) => _applyAssignedSubtitle()),
+      player.stream.tracks.listen((_) => _refreshActiveTracks()),
+      player.stream.track.listen((_) => _refreshActiveTracks()),
     ];
     if (library != null) {
       _historySubs = [

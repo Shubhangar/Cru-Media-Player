@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
@@ -7,6 +8,7 @@ import '../theme.dart';
 import 'flyouts.dart';
 import 'library/library_screen.dart' show ScanCache;
 import 'library/media_widgets.dart';
+import '../player/format.dart';
 
 /// Slide-out sidebar over the video: play queue, a compact library whose
 /// items can be dragged into the queue, and bookmarks.
@@ -131,9 +133,7 @@ class _QueueList extends StatelessWidget {
                             p.move(from, to > from ? to + 1 : to),
                         itemBuilder: (context, i) {
                           final m = pl.medias[i];
-                          final name = Uri.decodeComponent(
-                            m.uri.split(RegExp(r'[/\\]')).last,
-                          );
+                          final name = fileNameOf(m.uri);
                           final current = i == pl.index;
                           return ReorderableDragStartListener(
                             key: ValueKey('${m.uri}#$i'),
@@ -275,21 +275,46 @@ class _LibraryTab extends StatefulWidget {
 
 class _LibraryTabState extends State<_LibraryTab> {
   String _q = '';
-  late final Future<List<String>> _all = _items();
+  late Future<(List<String>, List<String>)> _all = _items();
 
   LibraryStore get lib => widget.controller.library!;
 
-  Future<List<String>> _items() async {
+  /// Recently played, then everything in the library folders (minus repeats).
+  Future<(List<String>, List<String>)> _items() async {
     final scans = await Future.wait([
       for (final f in lib.folders) ScanCache.get(f.path, f.kind),
     ]);
-    final paths = <String>{
-      for (final h in lib.recent(limit: 50)) h.uri,
+    final recent = [for (final h in lib.recent(limit: 50)) h.uri];
+    final seen = recent.toSet();
+    final folders = <String>[
       for (final l in scans)
-        for (final f in l) f.path,
-    };
-    return paths.toList();
+        for (final f in l)
+          if (seen.add(f.path)) f.path,
+    ];
+    return (recent, folders);
   }
+
+  Future<void> _addFolder() async {
+    final dir = await FilePicker.platform.getDirectoryPath();
+    if (dir == null) return;
+    lib.addFolder(dir, FolderKind.video);
+    setState(() => _all = _items());
+  }
+
+  bool _match(String u) => displayName(u).toLowerCase().contains(_q);
+
+  Widget _header(String text) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+    child: Text(
+      text.toUpperCase(),
+      style: TextStyle(
+        fontSize: 10.5,
+        letterSpacing: 1.2,
+        fontWeight: FontWeight.w600,
+        color: ConeColors.textMuted,
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -312,8 +337,8 @@ class _LibraryTabState extends State<_LibraryTab> {
           child: FutureBuilder(
             future: _all,
             builder: (context, snap) {
-              final all = snap.data;
-              if (all == null) {
+              final data = snap.data;
+              if (data == null) {
                 return const Center(
                   child: SizedBox(
                     width: 18,
@@ -322,24 +347,53 @@ class _LibraryTabState extends State<_LibraryTab> {
                   ),
                 );
               }
-              final items = all
-                  .where((u) => displayName(u).toLowerCase().contains(_q))
-                  .toList();
-              if (items.isEmpty) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text(
-                      'Add folders in the Library to see them here.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: ConeColors.textMuted),
+              final recent = data.$1.where(_match).toList();
+              final folders = data.$2.where(_match).toList();
+              return ListView(
+                children: [
+                  if (recent.isNotEmpty) ...[
+                    _header('Recently played'),
+                    for (final u in recent) _row(u),
+                  ],
+                  if (folders.isNotEmpty) ...[
+                    _header('In your folders'),
+                    for (final u in folders) _row(u),
+                  ],
+                  if (lib.folders.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Add a folder to browse its videos here.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: ConeColors.textMuted,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: _addFolder,
+                            icon: const Icon(
+                              Icons.create_new_folder_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Add a folder…'),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (recent.isEmpty && folders.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Text(
+                        'Nothing matches.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: ConeColors.textMuted),
+                      ),
                     ),
-                  ),
-                );
-              }
-              return ListView.builder(
-                itemCount: items.length,
-                itemBuilder: (_, i) => _row(items[i]),
+                ],
               );
             },
           ),

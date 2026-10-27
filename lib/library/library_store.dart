@@ -6,6 +6,7 @@ import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 
 import 'm3u.dart';
+import '../player/format.dart';
 
 const videoExtensions = {
   'mp4', 'mkv', 'webm', 'mov', 'avi', 'wmv', 'flv', 'm4v', 'mpg', 'mpeg', 'ts',
@@ -23,10 +24,7 @@ String extOf(String p) {
 bool isAudioPath(String p) => audioExtensions.contains(extOf(p));
 
 String displayName(String uri) {
-  final last = uri
-      .split(RegExp(r'[/\\]'))
-      .lastWhere((s) => s.isNotEmpty, orElse: () => uri);
-  final name = Uri.decodeComponent(last);
+  final name = fileNameOf(uri);
   final dot = name.lastIndexOf('.');
   return dot > 0 && !uri.contains('://') ? name.substring(0, dot) : name;
 }

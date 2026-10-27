@@ -134,7 +134,12 @@ plain-three.mp4
   });
 
   test('displayName strips folders and extensions but not URLs', () {
-    expect(displayName('/x/My%20Movie.mkv'), 'My Movie');
+    expect(displayName('/x/My Movie.mkv'), 'My Movie');
     expect(displayName('http://h/live/stream.m3u8'), 'stream.m3u8');
+    // Local names are shown as on disk; a stray % never throws.
+    expect(displayName('/x/50% off.mp4'), '50% off');
+    expect(displayName('/x/My%20Movie.mkv'), 'My%20Movie');
+    expect(displayName('http://h/My%20Show.mp4?t=1'), 'My Show.mp4');
+    expect(displayName('http://h/100%.mp4'), '100%.mp4');
   });
 }

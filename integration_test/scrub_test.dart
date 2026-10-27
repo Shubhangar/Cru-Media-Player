@@ -93,7 +93,7 @@ void main() {
       () =>
           previewer.lastFrameAt != null &&
           (previewer.lastFrameAt! - const Duration(seconds: 10)).abs() <
-              const Duration(seconds: 2),
+              const Duration(milliseconds: 500),
       what: 'preview near 00:10 (got ${previewer.lastFrameAt})',
     );
     // The frame must be real video, not black: the clip's background is a

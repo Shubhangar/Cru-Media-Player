@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import 'format.dart';
+
 /// One extra feed shown next to (grid) or over (floating) the main video.
 class Feed {
   final String uri;
@@ -19,10 +21,7 @@ class Feed {
     video = VideoController(player);
   }
 
-  String get name {
-    final last = uri.split(RegExp(r'[/\\]')).last;
-    return Uri.decodeComponent(last);
-  }
+  String get name => fileNameOf(uri);
 }
 
 enum MultiMode { off, grid, floating }
