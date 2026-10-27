@@ -37,14 +37,18 @@ void main() {
     await windowManager.ensureInitialized();
     // A stand-in "FSR.glsl" that paints everything magenta, so the effect is
     // unmistakable in the captured frame.
-    final folder = Directory('${tmp.path}/shaders')..createSync();
-    File('${folder.path}/FSR.glsl').writeAsStringSync('''
+    final folder = Directory('${tmp.path}${Platform.pathSeparator}shaders')
+      ..createSync();
+    File('${folder.path}${Platform.pathSeparator}FSR.glsl')
+        .writeAsStringSync('''
 //!HOOK MAIN
 //!BIND HOOKED
 //!DESC test magenta
 vec4 hook() { return vec4(1.0, 0.0, 1.0, 1.0); }
 ''');
-    final lib = LibraryStore(Directory('${tmp.path}/store'));
+    final lib = LibraryStore(
+      Directory('${tmp.path}${Platform.pathSeparator}store'),
+    );
     final c = PlayerController(
       settings: SettingsStore(prefix: testPrefix),
       library: lib,

@@ -150,7 +150,7 @@ class PlayerController extends ChangeNotifier {
   }
 
   List<String> get queueUris =>
-      player.state.playlist.medias.map((m) => m.uri).toList();
+      player.state.playlist.medias.map((m) => nativeMediaPath(m.uri)).toList();
 
   Future<void> loadSubtitle(String uri) async {
     await player.setSubtitleTrack(SubtitleTrack.uri(uri));
@@ -423,7 +423,7 @@ class PlayerController extends ChangeNotifier {
     if (pl.medias.isEmpty || pl.index < 0 || pl.index >= pl.medias.length) {
       return null;
     }
-    return pl.medias[pl.index].uri;
+    return nativeMediaPath(pl.medias[pl.index].uri);
   }
 
   /// Audio file, or a "video" that is only embedded cover art.

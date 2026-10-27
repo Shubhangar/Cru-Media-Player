@@ -41,11 +41,15 @@ void main() {
   testWidgets('frame previews and waveforms', (tester) async {
     MediaKit.ensureInitialized();
     await windowManager.ensureInitialized();
-    final lib = LibraryStore(Directory('${tmp.path}/store'));
+    final lib = LibraryStore(
+      Directory('${tmp.path}${Platform.pathSeparator}store'),
+    );
     final c = PlayerController(
       settings: SettingsStore(prefix: testPrefix),
       library: lib,
-      waveforms: WaveformService(Directory('${tmp.path}/waves')),
+      waveforms: WaveformService(
+        Directory('${tmp.path}${Platform.pathSeparator}waves'),
+      ),
     );
     Prefs.onboarded.set(c.settings, true);
     final p = c.player;
@@ -137,7 +141,7 @@ void main() {
     await snap(tester, 'p4-2-waveform');
     // Cached on disk for next time.
     expect(
-      Directory('${tmp.path}/waves')
+      Directory('${tmp.path}${Platform.pathSeparator}waves')
           .listSync()
           .where((e) => e.path.endsWith('.peaks')),
       hasLength(1),

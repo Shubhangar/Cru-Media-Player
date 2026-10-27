@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 /// Human-friendly formatting for technical values reported by mpv.
 
@@ -71,4 +72,15 @@ Map<String, String> parseTags(String json) {
 String _tagLabel(String k) {
   final words = k.replaceAll('_', ' ').toLowerCase();
   return words.isEmpty ? k : words[0].toUpperCase() + words.substring(1);
+}
+
+/// media_kit rewrites Windows paths with forward slashes (`C:/x/a.mp4`);
+/// everything else in the app (scanner, pickers, drops, history keys) uses
+/// the native form, so paths read back from the player are converted.
+String nativeMediaPath(String uri, {bool? windows}) {
+  if (!(windows ?? Platform.isWindows)) return uri;
+  if (RegExp(r'^[A-Za-z]:/').hasMatch(uri) || uri.startsWith('//')) {
+    return uri.replaceAll('/', r'\');
+  }
+  return uri;
 }

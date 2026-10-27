@@ -37,9 +37,11 @@ void main() {
     MediaKit.ensureInitialized();
     await windowManager.ensureInitialized();
     final angle = File(fixture('test-clip.mp4'))
-        .copySync('${tmp.path}/Angle B.mp4')
+        .copySync('${tmp.path}${Platform.pathSeparator}Angle B.mp4')
         .path;
-    final lib = LibraryStore(Directory('${tmp.path}/store'));
+    final lib = LibraryStore(
+      Directory('${tmp.path}${Platform.pathSeparator}store'),
+    );
     final c = PlayerController(
       settings: SettingsStore(prefix: testPrefix),
       library: lib,

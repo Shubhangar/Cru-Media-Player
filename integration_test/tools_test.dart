@@ -46,7 +46,7 @@ void main() {
     MediaKit.ensureInitialized();
     await windowManager.ensureInitialized();
     final clip = File(fixture('test-clip.mp4'))
-        .copySync('${tmp.path}/Clip.mp4')
+        .copySync('${tmp.path}${Platform.pathSeparator}Clip.mp4')
         .path;
 
     // A local HTTP "camera" and a fake DLNA renderer.
@@ -73,7 +73,9 @@ void main() {
       await r.response.close();
     });
 
-    final lib = LibraryStore(Directory('${tmp.path}/store'));
+    final lib = LibraryStore(
+      Directory('${tmp.path}${Platform.pathSeparator}store'),
+    );
     final c = PlayerController(
       settings: SettingsStore(prefix: testPrefix),
       library: lib,
@@ -155,7 +157,9 @@ void main() {
         what: 'conversion',
       );
       await snap(tester, 'p6-3-convert');
-      final out = File('${tmp.path}/Clip (mp4-720).mp4');
+      final out = File(
+        '${tmp.path}${Platform.pathSeparator}Clip (mp4-720).mp4',
+      );
       expect(out.lengthSync(), greaterThan(10000));
       await tester.tap(find.text('Play result'));
       await waitFor(

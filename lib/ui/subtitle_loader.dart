@@ -334,10 +334,11 @@ class _OnlineState extends State<_Online> {
       f.deleteSync();
       return beside;
     } catch (_) {
+      final sep = Platform.pathSeparator;
       final dir = Directory(
-        '${(await getApplicationSupportDirectory()).path}/subtitles',
+        '${(await getApplicationSupportDirectory()).path}${sep}subtitles',
       )..createSync(recursive: true);
-      return '${dir.path}/${_name(beside)}';
+      return '${dir.path}$sep${_name(beside)}';
     }
   }
 

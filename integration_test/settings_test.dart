@@ -46,7 +46,9 @@ void main() {
     MediaKit.ensureInitialized();
     await windowManager.ensureInitialized();
     final settings = SettingsStore(prefix: testPrefix);
-    final lib = LibraryStore(Directory('${tmp.path}/store'));
+    final lib = LibraryStore(
+      Directory('${tmp.path}${Platform.pathSeparator}store'),
+    );
     final c = PlayerController(settings: settings, library: lib);
     final p = c.player;
     final mpv = p.platform as NativePlayer;
@@ -157,7 +159,7 @@ void main() {
 
     await tester.tap(find.text('Network & more'));
     await settle(tester);
-    Prefs.shotFolder.set(settings, '${tmp.path}/shots');
+    Prefs.shotFolder.set(settings, '${tmp.path}${Platform.pathSeparator}shots');
     await settle(tester);
 
     // --- Layout customizer from Interface -----------------------------------
@@ -208,11 +210,15 @@ void main() {
     await waitFor(
       tester,
       () =>
-          Directory('${tmp.path}/shots').existsSync() &&
-          Directory('${tmp.path}/shots').listSync().isNotEmpty,
+          Directory('${tmp.path}${Platform.pathSeparator}shots').existsSync() &&
+          Directory('${tmp.path}${Platform.pathSeparator}shots')
+              .listSync()
+              .isNotEmpty,
       what: 'screenshot file',
     );
-    final shot = Directory('${tmp.path}/shots').listSync().single;
+    final shot = Directory('${tmp.path}${Platform.pathSeparator}shots')
+        .listSync()
+        .single;
     expect(shot.path, endsWith('.png'));
     expect(File(shot.path).lengthSync(), greaterThan(1000));
 

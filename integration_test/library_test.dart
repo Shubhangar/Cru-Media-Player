@@ -41,7 +41,9 @@ void main() {
   testWidgets('home, library, history, resume, streams, music', (tester) async {
     MediaKit.ensureInitialized();
     await windowManager.ensureInitialized();
-    final lib = LibraryStore(Directory('${tmp.path}/store'));
+    final lib = LibraryStore(
+      Directory('${tmp.path}${Platform.pathSeparator}store'),
+    );
     await lib.load();
     final c = PlayerController(
       settings: SettingsStore(prefix: testPrefix),
@@ -137,7 +139,7 @@ void main() {
     expect(find.byType(ResumeBanner), findsNothing);
 
     // --- IPTV: local M3U with groups; N zaps to the next channel ----------
-    final m3u = File('${tmp.path}/tv.m3u')
+    final m3u = File('${tmp.path}${Platform.pathSeparator}tv.m3u')
       ..writeAsStringSync(
         '#EXTM3U\n'
         '#EXTINF:-1 group-title="Movies",Clip Channel\n$clip\n'

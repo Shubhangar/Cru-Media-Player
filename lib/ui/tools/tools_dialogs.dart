@@ -336,7 +336,7 @@ List<String> mediaRefsIn(String text) => [
   for (final raw in text.split(RegExp(r'[\s"<>]+')))
     if (raw.contains('://') ||
         (raw.startsWith('/') && File(raw).existsSync()) ||
-        (RegExp(r'^[A-Za-z]:\\').hasMatch(raw) && File(raw).existsSync()))
+        (RegExp(r'^[A-Za-z]:[\\/]').hasMatch(raw) && File(raw).existsSync()))
       raw,
 ];
 

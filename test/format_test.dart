@@ -28,4 +28,16 @@ void main() {
     });
     expect(parseTags('not json'), isEmpty);
   });
+  test('nativeMediaPath', () {
+    expect(nativeMediaPath('C:/v/a b.mp4', windows: true), r'C:\v\a b.mp4');
+    expect(
+      nativeMediaPath('//nas/share/a.mp4', windows: true),
+      r'\\nas\share\a.mp4',
+    );
+    expect(
+      nativeMediaPath('https://x/a.mp4', windows: true),
+      'https://x/a.mp4',
+    );
+    expect(nativeMediaPath('/home/a.mp4', windows: false), '/home/a.mp4');
+  });
 }

@@ -37,9 +37,9 @@ void main() {
     await windowManager.ensureInitialized();
     // Work on a copy so downloads land in the temp folder, not the repo.
     final clip = File(fixture('test-clip.mp4'))
-        .copySync('${tmp.path}/Clip.mp4')
+        .copySync('${tmp.path}${Platform.pathSeparator}Clip.mp4')
         .path;
-    File('${tmp.path}/Clip.fr.srt')
+    File('${tmp.path}${Platform.pathSeparator}Clip.fr.srt')
         .writeAsStringSync('1\n00:00:01,000 --> 00:00:02,000\nBonjour\n');
     final c = PlayerController(settings: SettingsStore(prefix: testPrefix));
     Prefs.onboarded.set(c.settings, true);
@@ -139,7 +139,7 @@ void main() {
       what: 'download assigned',
     );
     final saved = c.assignedSubtitles[clip]!;
-    expect(saved, '${tmp.path}/Clip.en.srt');
+    expect(saved, '${tmp.path}${Platform.pathSeparator}Clip.en.srt');
     expect(File(saved).readAsStringSync(), contains('Downloaded line'));
     expect(requests, [
       'GET /api/v1/subtitles',
