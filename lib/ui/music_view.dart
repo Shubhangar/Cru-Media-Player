@@ -13,8 +13,7 @@ import '../theme.dart';
 /// bundled ffmpeg cannot decode embedded PNG covers.
 class MusicView extends StatelessWidget {
   final PlayerController c;
-  final Widget? waveform;
-  const MusicView({super.key, required this.c, this.waveform});
+  const MusicView({super.key, required this.c});
 
   @override
   Widget build(BuildContext context) {
@@ -74,33 +73,26 @@ class MusicView extends StatelessWidget {
                 box.maxWidth * 0.08,
                 150,
               ),
-              child: Column(
+              child: Row(
                 children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Container(
-                          width: side,
-                          height: side,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(ConeRadius.lg),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x99000000),
-                                blurRadius: 40,
-                                offset: Offset(0, 16),
-                              ),
-                            ],
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: cover(),
+                  Container(
+                    width: side,
+                    height: side,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(ConeRadius.lg),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x99000000),
+                          blurRadius: 40,
+                          offset: Offset(0, 16),
                         ),
-                        const SizedBox(width: 40),
-                        Expanded(child: _TrackInfo(c: c)),
                       ],
                     ),
+                    clipBehavior: Clip.antiAlias,
+                    child: cover(),
                   ),
-                  ?waveform,
+                  const SizedBox(width: 40),
+                  Expanded(child: _TrackInfo(c: c)),
                 ],
               ),
             );

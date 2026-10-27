@@ -21,6 +21,8 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'test_window.dart';
+
 const fixtures = String.fromEnvironment('FIXTURES');
 
 /// Path of a fixture file with this OS's separator (Windows uses `\`).
@@ -79,7 +81,7 @@ void main() {
   testWidgets('core player flows', (tester) async {
     expect(fixtures, isNotEmpty, reason: 'pass --dart-define=FIXTURES=<dir>');
     MediaKit.ensureInitialized();
-    await windowManager.ensureInitialized();
+    await prepareTestWindow();
 
     final c = PlayerController(settings: SettingsStore(prefix: testPrefix));
     Prefs.onboarded.set(c.settings, true);
@@ -255,7 +257,7 @@ void main() {
 
   testWidgets('inspector panels drive mpv', (tester) async {
     MediaKit.ensureInitialized();
-    await windowManager.ensureInitialized();
+    await prepareTestWindow();
     final c = PlayerController(settings: SettingsStore(prefix: testPrefix));
     Prefs.onboarded.set(c.settings, true);
     final p = c.player;

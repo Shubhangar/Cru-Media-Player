@@ -41,6 +41,8 @@ import '../tools/cast_session.dart';
 import '../player/multiview.dart';
 import '../player/settings_store.dart';
 import '../player/system_open.dart';
+import '../player/trackpad.dart';
+import '../player/display_brightness.dart';
 import '../settings/prefs.dart';
 import 'seek_bar.dart';
 
@@ -198,6 +200,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   DateTime _lastScrubSeek = DateTime(0);
 
   void _panStart() {
+    _padLeft = null;
+    _padAsked = false;
+    _screenLevel = null;
+    _screenUnavailable = false; // the window may have changed display
     _panTotal = Offset.zero;
     _panAxis = null;
     _scrubBase = _scrubTarget = null;
@@ -554,19 +560,65 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   // ---- Gestures (trackpad / touch / mouse) -----------------------------
 
-  void _sideAdjust(double localX, double width, double dy) {
-    // Swipe up = increase. Left half = brightness, right half = volume.
+  bool _touchDrag = false;
+
+  /// Display brightness (0..1) during a swipe; read once when it starts.
+  double? _screenLevel;
+  bool _screenUnavailable = false;
+  Future<void>? _screenRead;
+
+  /// Trackpad side for this swipe: true = left half (brightness).
+  bool? _padLeft;
+  bool _padAsked = false;
+
+  /// Vertical two-finger swipe: the half of the trackpad the fingers are on
+  /// decides (left = brightness, right = volume); without a reading, the
+  /// half of the window under the pointer.
+  void _trackpadAdjust(double localX, double width, double dy) {
+    final left = _padLeft;
+    if (left != null) return _sideAdjust(left, dy);
+    if (_padAsked) return; // reading the finger position; skip this delta
+    _padAsked = true;
+    Trackpad.fingerX().then(
+      (x) => _padLeft = x == null ? localX < width / 2 : x < 0.5,
+    );
+  }
+
+  void _sideAdjust(bool left, double dy) {
+    // Swipe up = increase. Left = brightness, right = volume.
     final delta = -dy * 0.25;
-    if (localX < width / 2) {
+    if (left) {
+      if (_adjustScreen(delta)) return;
+      // No controllable display (Linux, most external monitors): video.
       if (_brightness.round() != c.adjust.brightness) {
         _brightness = c.adjust.brightness.toDouble();
       }
       _brightness = (_brightness + delta).clamp(-100.0, 100.0);
       c.setVideo(c.adjust.copyWith(brightness: _brightness.round()));
-      c.notify('Brightness ${_brightness.round()}');
+      c.notify('Video brightness ${_brightness.round()}', 'Swipe');
     } else {
       c.setVolume(p.state.volume + delta, 'Swipe');
     }
+  }
+
+  /// Adjusts the display's own brightness; false when it can't be driven.
+  bool _adjustScreen(double delta) {
+    final level = _screenLevel;
+    if (level == null) {
+      if (_screenRead == null && _screenLevel == null) {
+        _screenRead = DisplayBrightness.get().then((v) {
+          _screenLevel = v;
+          _screenUnavailable = v == null;
+          _screenRead = null;
+        });
+      }
+      return !_screenUnavailable; // swallow deltas while reading
+    }
+    final next = (level + delta / 100).clamp(0.0, 1.0);
+    _screenLevel = next;
+    DisplayBrightness.set(next);
+    c.notify('Brightness ${(next * 100).round()}%', 'Swipe');
+    return true;
   }
 
   void _doubleTap(TapDownDetails d, double width) {
@@ -876,7 +928,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             case Axis.horizontal:
               _scrub(_panTotal.dx, box.maxWidth);
             case Axis.vertical:
-              _sideAdjust(e.localPosition.dx, box.maxWidth, e.panDelta.dy);
+              _trackpadAdjust(e.localPosition.dx, box.maxWidth, e.panDelta.dy);
             case null:
               break;
           }
@@ -896,9 +948,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
           onDoubleTap: () {},
           onSecondaryTapDown: (d) =>
               _contextMenu.open(position: d.localPosition),
-          // Touchscreens: vertical swipe on left/right halves.
-          onVerticalDragUpdate: (d) =>
-              _sideAdjust(d.localPosition.dx, box.maxWidth, d.delta.dy),
+          // Touchscreens only: vertical swipe on left/right halves.
+          // (Trackpad swipes go through the axis-locked Listener above;
+          // handling them here too fired on every horizontal scrub.)
+          onVerticalDragStart: (d) {
+            _touchDrag = d.kind == PointerDeviceKind.touch;
+            _screenLevel = null;
+            _screenUnavailable = false;
+          },
+          onVerticalDragUpdate: (d) {
+            if (_touchDrag) {
+              _sideAdjust(d.localPosition.dx < box.maxWidth / 2, d.delta.dy);
+            }
+          },
           supportedDevices: const {
             PointerDeviceKind.touch,
             PointerDeviceKind.mouse,
@@ -906,22 +968,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           },
           // Flips are a GPU transform here (cheap, works with hwdec).
           child: c.isAudioOnly
-              ? MusicView(
-                  c: c,
-                  waveform: StreamBuilder<Duration>(
-                    stream: p.stream.position,
-                    builder: (_, _) => SeekBar(
-                      position: p.state.position,
-                      duration: p.state.duration,
-                      buffer: p.state.buffer,
-                      bookmarks: c.bookmarks,
-                      onSeek: p.seek,
-                      onFrameStep: (fwd) => c.frameStep(fwd, 'Scroll'),
-                      waveform: c.waveform,
-                      waveformHeight: 72,
-                    ),
-                  ),
-                )
+              ? MusicView(c: c)
               : Transform.scale(
                   scaleX: c.adjust.hflip ? -1 : 1,
                   scaleY: c.adjust.vflip ? -1 : 1,
@@ -1264,9 +1311,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
           'one' => Icons.repeat_one,
           _ => Icons.repeat,
         },
-        tooltip: 'Repeat',
+        tooltip: switch (Prefs.repeat.of(_s)) {
+          'one' => 'Repeat this file',
+          'all' => 'Repeat queue',
+          _ => 'Repeat',
+        },
         active: Prefs.repeat.of(_s) != 'off',
         onPressed: _cycleRepeat,
+      ),
+    ],
+    ControlId.shuffle => [
+      ControlIcon(
+        icon: Icons.shuffle,
+        tooltip: p.state.shuffle ? 'Shuffle on' : 'Shuffle',
+        active: p.state.shuffle,
+        onPressed: () => c.toggleShuffle(),
       ),
     ],
     ControlId.fullscreen => [
@@ -1348,7 +1407,42 @@ class _PlayerScreenState extends State<PlayerScreen> {
     ],
   };
 
+  /// Rough widths, used to drop the least important buttons when the
+  /// window is too narrow for the whole layout.
+  static double _controlWidth(ControlId id) => switch (id) {
+    ControlId.volume => 136,
+    ControlId.time => 130,
+    ControlId.play => 46,
+    _ => 40,
+  };
+  static const _dropOrder = [
+    ControlId.shuffle,
+    ControlId.repeat,
+    ControlId.cast,
+    ControlId.screenshot,
+    ControlId.bookmark,
+    ControlId.rotate,
+    ControlId.speed,
+    ControlId.frameBack,
+    ControlId.frameForward,
+    ControlId.pip,
+    ControlId.library,
+    ControlId.inspector,
+    ControlId.queue,
+    ControlId.subtitles,
+    ControlId.audio,
+  ];
+
   Widget _bottomBar(double width) {
+    final left = [..._layouts.active.left];
+    final right = [..._layouts.active.right];
+    double used() =>
+        [...left, ...right].fold(28.0, (a, id) => a + _controlWidth(id));
+    for (final id in _dropOrder) {
+      if (used() <= width) break;
+      left.remove(id);
+      right.remove(id);
+    }
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 28, 12, 6),
       decoration: const BoxDecoration(
@@ -1363,13 +1457,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
         children: [
           Row(
             children: [
-              for (final id in _layouts.active.left) ..._control(id),
+              for (final id in left) ..._control(id),
               const Spacer(),
-              for (final id in _layouts.active.right) ..._control(id),
+              for (final id in right) ..._control(id),
               const SizedBox(width: 4),
             ],
           ),
-          // Music shows a large waveform scrubber in its own layout.
           if (!c.isAudioOnly && c.showSubtitleTimeline) ...[
             const SizedBox(height: 6),
             if (c.cues == null)
@@ -1388,22 +1481,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 ),
               ),
           ],
-          if (!c.isAudioOnly) ...[
-            const SizedBox(height: 2),
-            StreamBuilder<Duration>(
-              stream: p.stream.position,
-              builder: (_, _) => SeekBar(
-                position: p.state.position,
-                duration: p.state.duration,
-                buffer: p.state.buffer,
-                bookmarks: c.bookmarks,
-                onSeek: p.seek,
-                onFrameStep: (fwd) => c.frameStep(fwd, 'Scroll'),
-                waveform: c.showWaveform ? c.waveform : null,
-                preview: _previewAt,
-              ),
+          const SizedBox(height: 2),
+          // Music scrubs on its waveform; video on a bar (waveform optional).
+          StreamBuilder<Duration>(
+            stream: p.stream.position,
+            builder: (_, _) => SeekBar(
+              position: p.state.position,
+              duration: p.state.duration,
+              buffer: p.state.buffer,
+              bookmarks: c.bookmarks,
+              onSeek: p.seek,
+              onFrameStep: (fwd) => c.frameStep(fwd, 'Scroll'),
+              waveform: c.isAudioOnly || c.showWaveform ? c.waveform : null,
+              waveformHeight: c.isAudioOnly ? 48 : 30,
+              preview: _previewAt,
             ),
-          ],
+          ),
         ],
       ),
     );

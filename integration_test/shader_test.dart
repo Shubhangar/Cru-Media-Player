@@ -14,9 +14,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:window_manager/window_manager.dart';
 
 import 'helpers.dart';
+import 'test_window.dart';
 
 final testPrefix = 'test${DateTime.now().microsecondsSinceEpoch}.';
 
@@ -34,7 +34,7 @@ void main() {
 
   testWidgets('shaders: built-ins and folder presets', (tester) async {
     MediaKit.ensureInitialized();
-    await windowManager.ensureInitialized();
+    await prepareTestWindow();
     // A stand-in "FSR.glsl" that paints everything magenta, so the effect is
     // unmistakable in the captured frame.
     final folder = Directory('${tmp.path}${Platform.pathSeparator}shaders')

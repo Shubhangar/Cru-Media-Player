@@ -130,6 +130,22 @@ class MultiView extends ChangeNotifier {
     _syncFeed(f, force: true);
   }
 
+  /// Seeks one feed on its own. While synced, the jump becomes the feed's
+  /// offset from the main video, so lining up angles is: pause, scrub each
+  /// tile to the same moment, play.
+  Future<void> seekFeed(Feed f, Duration to) async {
+    if (sync) {
+      final ms = (to - master.state.position).inMilliseconds;
+      f.offset = double.parse((ms / 1000).toStringAsFixed(2));
+      notifyListeners();
+    }
+    await f.player.seek(to);
+  }
+
+  /// Play / pause one feed (only meaningful while sync is off).
+  Future<void> toggleFeed(Feed f) =>
+      f.player.state.playing ? f.player.pause() : f.player.play();
+
   /// Makes one source audible and mutes the others.
   Future<void> setAudioFocus(int index) async {
     if (audioFocus == -1) _masterVolume = master.state.volume;

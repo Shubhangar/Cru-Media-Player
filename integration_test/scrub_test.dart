@@ -10,7 +10,6 @@ import 'package:cone_player/player/settings_store.dart';
 import 'package:cone_player/settings/prefs.dart';
 import 'package:cone_player/player/waveform.dart';
 import 'package:cone_player/theme.dart';
-import 'package:cone_player/ui/music_view.dart';
 import 'package:cone_player/ui/player_screen.dart';
 import 'package:cone_player/ui/seek_bar.dart';
 import 'package:cone_player/ui/subtitle_timeline.dart';
@@ -20,9 +19,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:window_manager/window_manager.dart';
 
 import 'helpers.dart';
+import 'test_window.dart';
 
 final testPrefix = 'test${DateTime.now().microsecondsSinceEpoch}.';
 
@@ -40,7 +39,7 @@ void main() {
 
   testWidgets('frame previews and waveforms', (tester) async {
     MediaKit.ensureInitialized();
-    await windowManager.ensureInitialized();
+    await prepareTestWindow();
     final lib = LibraryStore(
       Directory('${tmp.path}${Platform.pathSeparator}store'),
     );
@@ -200,7 +199,7 @@ void main() {
     await snap(tester, 'p4-7-yellow-subs');
     await c.setSubStyle(builtInSubtitleStyles.first.style);
 
-    // --- Music: tall waveform scrubber -------------------------------------
+    // --- Music: the seek bar becomes a waveform ------------------------------
     c.setOverlay(waveform: false);
     await c.openAll([fixture('test-song.m4a')]);
     await waitFor(tester, () => c.isAudioOnly, what: 'music');
@@ -208,7 +207,7 @@ void main() {
       tester,
       () => find
           .descendant(
-            of: find.byType(MusicView),
+            of: find.byType(SeekBar),
             matching: find.byWidgetPredicate(
               (w) => w is CustomPaint && w.painter is WaveformPainter,
             ),
@@ -217,13 +216,15 @@ void main() {
           .isNotEmpty,
       what: 'music waveform',
     );
-    // Tapping the waveform seeks.
-    final wave = tester.getRect(
-      find.descendant(
-        of: find.byType(MusicView),
-        matching: find.byType(SeekBar),
-      ),
+    expect(find.byType(SeekBar), findsOneWidget);
+    // The audio menu marks the track that is playing, not "Disabled".
+    await waitFor(
+      tester,
+      () => c.playingAudioId != null && c.playingAudioId != 'no',
+      what: 'active audio track',
     );
+    // Tapping the waveform seeks.
+    final wave = tester.getRect(find.byType(SeekBar));
     await tester.tapAt(wave.centerLeft + Offset(wave.width * 0.75, 0));
     await waitFor(
       tester,

@@ -16,9 +16,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:window_manager/window_manager.dart';
 
 import 'helpers.dart';
+import 'test_window.dart';
 
 final testPrefix = 'test${DateTime.now().microsecondsSinceEpoch}.';
 
@@ -44,7 +44,7 @@ void main() {
 
   testWidgets('hub, capture, clipboard, convert, cast', (tester) async {
     MediaKit.ensureInitialized();
-    await windowManager.ensureInitialized();
+    await prepareTestWindow();
     final clip = File(fixture('test-clip.mp4'))
         .copySync('${tmp.path}${Platform.pathSeparator}Clip.mp4')
         .path;

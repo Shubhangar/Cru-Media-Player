@@ -100,8 +100,9 @@ class PlayerController extends ChangeNotifier {
   NativePlayer? get _mpv =>
       player.platform is NativePlayer ? player.platform as NativePlayer : null;
 
-  void notify(String action, [String? shortcut]) =>
-      _osd.add(OsdMessage(action, shortcut));
+  void notify(String action, [String? shortcut]) {
+    if (!_osd.isClosed) _osd.add(OsdMessage(action, shortcut));
+  }
 
   // ---- Loading ----------------------------------------------------------
 
@@ -270,6 +271,13 @@ class PlayerController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
+  Future<void> toggleShuffle() async {
+    final on = !player.state.shuffle;
+    await player.setShuffle(on);
+    notify(on ? 'Shuffle on' : 'Shuffle off');
+    notifyListeners();
+  }
+
   // ---- Bookmarks --------------------------------------------------------
 
   void addBookmark([String? key]) {
@@ -423,7 +431,20 @@ class PlayerController extends ChangeNotifier {
       player.stream.duration.listen((_) => _applyAssignedSubtitle()),
       player.stream.tracks.listen((_) => _refreshActiveTracks()),
       player.stream.track.listen((_) => _refreshActiveTracks()),
+      player.stream.duration.listen((_) => _refreshActiveTracks()),
     ];
+    // mpv picks the track after track-list changes; follow the selection
+    // itself so the menus never mark "Disabled" for a playing track. Not
+    // awaited: observing waits for the video surface, which is only created
+    // once the screen (waiting on init) has built.
+    for (final name in const [
+      'current-tracks/audio/id',
+      'current-tracks/sub/id',
+    ]) {
+      _mpv
+          ?.observeProperty(name, (_) async => _refreshActiveTracks())
+          .catchError((_) {});
+    }
     if (library != null) {
       _historySubs = [
         player.stream.duration.listen((_) => _checkFileChange()),

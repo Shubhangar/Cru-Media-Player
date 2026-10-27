@@ -4,7 +4,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 case "$(uname -s)" in
-  Darwin) device=macos ;;
+  Darwin)
+    device=macos
+    # If the test app can't come to the front (you're using another app),
+    # App Nap throttles its timers and a 20 s test can take an hour.
+    defaults write dev.crumediaplayer.app.debug NSAppSleepDisabled -bool YES
+    ;;
   Linux) device=linux ;;
   *) device=windows ;;
 esac

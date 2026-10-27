@@ -9,15 +9,16 @@ import 'package:cone_player/settings/prefs.dart';
 import 'package:cone_player/theme.dart';
 import 'package:cone_player/ui/multiview_view.dart';
 import 'package:cone_player/ui/player_screen.dart';
+import 'package:cone_player/ui/seek_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:window_manager/window_manager.dart';
 
 import 'helpers.dart';
+import 'test_window.dart';
 
 final testPrefix = 'test${DateTime.now().microsecondsSinceEpoch}.';
 
@@ -35,7 +36,7 @@ void main() {
 
   testWidgets('feeds follow the master and can float', (tester) async {
     MediaKit.ensureInitialized();
-    await windowManager.ensureInitialized();
+    await prepareTestWindow();
     final angle = File(fixture('test-clip.mp4'))
         .copySync('${tmp.path}${Platform.pathSeparator}Angle B.mp4')
         .path;
@@ -132,6 +133,20 @@ void main() {
       () => !feed.player.state.playing,
       what: 'feed pauses',
     );
+
+    // Each tile has its own seek bar (shown on hover). Scrubbing a synced
+    // feed re-aligns it: the jump becomes its offset.
+    expect(
+      find.descendant(
+        of: find.byType(MultiViewGrid),
+        matching: find.byType(SeekBar),
+      ),
+      findsNWidgets(3),
+    );
+    await mv.seekFeed(feed, p.state.position + const Duration(seconds: 5));
+    await settle(tester, 900);
+    expect(feed.offset, closeTo(5.0, 0.15));
+    expect(mv.drift(feed), lessThan(const Duration(milliseconds: 500)));
 
     // Audio focus: listening to the feed mutes the main video.
     Finder inGrid(Finder f) =>

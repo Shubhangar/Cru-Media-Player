@@ -18,6 +18,7 @@ enum ControlId {
   screenshot('Screenshot', Icons.photo_camera_outlined),
   rotate('Rotate', Icons.rotate_90_degrees_cw_outlined),
   repeat('Repeat', Icons.repeat),
+  shuffle('Shuffle', Icons.shuffle),
   fullscreen('Fullscreen', Icons.fullscreen),
   pip('Picture-in-picture', Icons.picture_in_picture_alt_outlined),
   queue('Queue', Icons.queue_music),
@@ -60,6 +61,9 @@ const defaultLayouts = <String, BarLayout>{
   'Default': BarLayout(
     [ControlId.prev, ControlId.play, ControlId.next, ControlId.time],
     [
+      ControlId.shuffle,
+      ControlId.repeat,
+      ControlId.cast,
       ControlId.fullscreen,
       ControlId.pip,
       ControlId.queue,
@@ -85,7 +89,9 @@ const defaultLayouts = <String, BarLayout>{
     [
       ControlId.bookmark,
       ControlId.screenshot,
+      ControlId.shuffle,
       ControlId.repeat,
+      ControlId.cast,
       ControlId.subtitles,
       ControlId.audio,
       ControlId.inspector,

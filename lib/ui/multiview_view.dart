@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../player/multiview.dart';
@@ -99,6 +100,106 @@ Future<void> addFeedFlow(
   }
 }
 
+/// Bottom strip on a tile: its own play/pause (when not synced), seek bar
+/// and time. Seeking a synced feed sets its offset instead of breaking sync.
+class _TileControls extends StatelessWidget {
+  final Player player;
+  final ValueChanged<Duration> onSeek;
+  final VoidCallback? onPlay;
+  const _TileControls({
+    required this.player,
+    required this.onSeek,
+    this.onPlay,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(4, 10, 10, 2),
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.bottomCenter,
+        end: Alignment.topCenter,
+        colors: [Color(0xCC000000), Color(0x00000000)],
+      ),
+    ),
+    child: StreamBuilder<Duration>(
+      stream: player.stream.position,
+      builder: (_, _) {
+        final s = player.state;
+        return Row(
+          children: [
+            if (onPlay != null)
+              ControlIcon(
+                icon: s.playing
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
+                tooltip: s.playing ? 'Pause this feed' : 'Play this feed',
+                size: 20,
+                onPressed: onPlay!,
+              )
+            else
+              const SizedBox(width: 6),
+            Expanded(
+              child: SeekBar(
+                position: s.position,
+                duration: s.duration,
+                buffer: s.buffer,
+                bookmarks: const [],
+                onSeek: onSeek,
+                onFrameStep: (_) {},
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${formatDuration(s.position)} / ${formatDuration(s.duration)}',
+              style: const TextStyle(
+                fontSize: 11,
+                color: ConeColors.textMuted,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+/// Shows [child] while the pointer is over the tile.
+class _HoverReveal extends StatefulWidget {
+  final Widget child;
+  final Widget overlay;
+  const _HoverReveal({required this.child, required this.overlay});
+
+  @override
+  State<_HoverReveal> createState() => _HoverRevealState();
+}
+
+class _HoverRevealState extends State<_HoverReveal> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    onEnter: (_) => setState(() => _hover = true),
+    onExit: (_) => setState(() => _hover = false),
+    child: Stack(
+      children: [
+        Positioned.fill(child: widget.child),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: AnimatedOpacity(
+            opacity: _hover ? 1 : 0,
+            duration: const Duration(milliseconds: 150),
+            child: IgnorePointer(ignoring: !_hover, child: widget.overlay),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 /// Header strip on each tile: name, offset, audio focus, remove.
 class _TileBar extends StatelessWidget {
   final String name;
@@ -180,7 +281,10 @@ class MultiViewGrid extends StatelessWidget {
         builder: (context, _) {
           final tiles = <Widget>[
             _tile(
-              _video(c.video),
+              _HoverReveal(
+                overlay: _TileControls(player: p, onSeek: p.seek),
+                child: _video(c.video),
+              ),
               _TileBar(
                 name: 'Main · ${c.title}',
                 audible: mv.audioFocus == -1,
@@ -191,7 +295,14 @@ class MultiViewGrid extends StatelessWidget {
             ),
             for (var i = 0; i < mv.feeds.length; i++)
               _tile(
-                _video(mv.feeds[i].video),
+                _HoverReveal(
+                  overlay: _TileControls(
+                    player: mv.feeds[i].player,
+                    onSeek: (d) => mv.seekFeed(mv.feeds[i], d),
+                    onPlay: mv.sync ? null : () => mv.toggleFeed(mv.feeds[i]),
+                  ),
+                  child: _video(mv.feeds[i].video),
+                ),
                 _TileBar(
                   name: mv.feeds[i].name,
                   audible: mv.audioFocus == i,
@@ -288,8 +399,9 @@ class MultiViewGrid extends StatelessWidget {
         ),
         const InfoTip(
           'Watch several videos at once, kept in sync with the main one. '
-          'Use the offset on a feed to line up different camera angles, and '
-          'the speaker to choose which one you hear.',
+          'To line up different camera angles, pause, then hover a feed and '
+          'scrub it to the matching moment (or nudge its offset). Use the '
+          'speaker to choose which one you hear.',
         ),
         const SizedBox(width: 20),
         const Text('Sync', style: TextStyle(color: ConeColors.textMuted)),
@@ -383,9 +495,19 @@ class MultiViewFloating extends StatelessWidget {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: GestureDetector(
-                      onDoubleTap: onGrid,
-                      child: _video(f.video),
+                    child: _HoverReveal(
+                      overlay: Padding(
+                        padding: const EdgeInsets.only(right: 18),
+                        child: _TileControls(
+                          player: f.player,
+                          onSeek: (d) => mv.seekFeed(f, d),
+                          onPlay: mv.sync ? null : () => mv.toggleFeed(f),
+                        ),
+                      ),
+                      child: GestureDetector(
+                        onDoubleTap: onGrid,
+                        child: _video(f.video),
+                      ),
                     ),
                   ),
                   Positioned(
