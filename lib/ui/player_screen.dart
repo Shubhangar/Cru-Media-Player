@@ -40,6 +40,7 @@ import 'tools/tools_dialogs.dart';
 import '../tools/cast_session.dart';
 import '../player/multiview.dart';
 import '../player/settings_store.dart';
+import '../player/system_open.dart';
 import '../settings/prefs.dart';
 import 'seek_bar.dart';
 
@@ -215,9 +216,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _onPrefs();
     _multi.addListener(() => mounted ? setState(() {}) : null);
     _cast.addListener(() => mounted ? setState(() {}) : null);
-    c.init().then((_) {
-      if (widget.initialFiles.isNotEmpty) c.openAll(widget.initialFiles);
+    c.init().then((_) async {
+      final launched = await SystemOpen.listen(_openFromSystem);
+      final files = [...widget.initialFiles, ...launched];
+      if (files.isNotEmpty) await _openFromSystem(files);
     });
+  }
+
+  /// Files from the command line or the OS (Finder "Open With", Dock icon):
+  /// media replaces what is playing; a subtitle file loads onto it.
+  Future<void> _openFromSystem(List<String> files) async {
+    final subs = files.where(
+      (f) => subtitleExtensions.contains(f.split('.').last.toLowerCase()),
+    );
+    final media = files.where((f) => !subs.contains(f)).toList();
+    if (media.isNotEmpty) {
+      await c.openAll(media);
+    } else if (subs.isNotEmpty && _hasMedia) {
+      await c.loadSubtitle(subs.first);
+    }
+    if (files.isNotEmpty) await windowManager.focus();
   }
 
   @override
