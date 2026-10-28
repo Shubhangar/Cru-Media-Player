@@ -7,7 +7,37 @@ A new media player.
 Cross-platform (macOS, Windows, Linux) video player built with Flutter on top of
 libmpv (via [media_kit](https://pub.dev/packages/media_kit)).
 
-## Run
+## Download
+
+**[⬇ Download the latest release](https://github.com/Shubhangar/Cru-Media-Player/releases/latest)**
+
+| System | File |
+|---|---|
+| macOS 10.15+ (Apple silicon & Intel) | [Cru-Media-Player-macOS.dmg](https://github.com/Shubhangar/Cru-Media-Player/releases/latest/download/Cru-Media-Player-macOS.dmg) |
+| Windows 10/11 (64-bit) | [Cru-Media-Player-Windows-Setup.exe](https://github.com/Shubhangar/Cru-Media-Player/releases/latest/download/Cru-Media-Player-Windows-Setup.exe) · [portable .zip](https://github.com/Shubhangar/Cru-Media-Player/releases/latest/download/Cru-Media-Player-Windows-portable.zip) |
+| Linux x64 | [Cru-Media-Player-Linux-x64.tar.gz](https://github.com/Shubhangar/Cru-Media-Player/releases/latest/download/Cru-Media-Player-Linux-x64.tar.gz) (needs `libmpv2`) |
+
+- **macOS:** open the .dmg and drag the app to Applications. It isn't
+  notarized by Apple yet, so the first time right-click it › **Open** ›
+  **Open** (or System Settings › Privacy & Security › **Open Anyway**).
+- **Windows:** run the installer. SmartScreen may warn about an
+  unrecognised app: **More info** › **Run anyway**.
+- **Linux:** `sudo apt install libmpv2`, extract, run `cru-media-player/cru_media_player`.
+
+### Publishing a release
+
+Bump `version:` in `pubspec.yaml`, then tag and push:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+`.github/workflows/release.yml` builds the macOS disk image, Windows
+installer + portable zip and Linux archive, and publishes them on the
+Releases page. Running that workflow by hand (Actions › Release › Run
+workflow) builds the same files as a dry run without publishing.
+
+## Build from source
 
 ```bash
 flutter pub get

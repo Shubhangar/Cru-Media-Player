@@ -1,0 +1,139 @@
+name: Release
+
+# Push a tag like v1.0.0 to build installers for every platform and publish
+# them on the repository's Releases page. Running it by hand (Actions tab ›
+# Release › Run workflow) builds the same files as a dry run, without
+# publishing anything.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: 3.47.8
+
+jobs:
+  macos:
+    name: macOS (.dmg)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - name: Build
+        run: flutter build macos --release $(tool/build_name.sh)
+      - name: Package disk image
+        run: |
+          mkdir dmg
+          cp -R "build/macos/Build/Products/Release/Cru Media Player.app" dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "Cru Media Player" -srcfolder dmg \
+            -ov -format UDZO Cru-Media-Player-macOS.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: Cru-Media-Player-macOS.dmg
+
+  windows:
+    name: Windows (installer + portable .zip)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - name: Build
+        shell: bash
+        run: flutter build windows --release $(tool/build_name.sh)
+      - name: Installer
+        shell: bash
+        run: |
+          version=$(tool/build_name.sh --plain)
+          iscc="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          [ -f "$iscc" ] || choco install innosetup -y --no-progress
+          "$iscc" \
+            "//DAppVersion=$version" windows/installer.iss
+      - name: Portable zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path build/windows/x64/runner/Release/* `
+            -DestinationPath Cru-Media-Player-Windows-portable.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            Cru-Media-Player-Windows-Setup.exe
+            Cru-Media-Player-Windows-portable.zip
+
+  linux:
+    name: Linux (.tar.gz)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libmpv-dev libasound2-dev
+      - run: flutter pub get
+      - name: Build
+        run: flutter build linux --release $(tool/build_name.sh)
+      - name: Package
+        run: |
+          mv build/linux/x64/release/bundle cru-media-player
+          tar -czf Cru-Media-Player-Linux-x64.tar.gz cru-media-player
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: Cru-Media-Player-Linux-x64.tar.gz
+
+  publish:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, windows, linux]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            ## Download
+
+            | System | File |
+            |---|---|
+            | macOS 10.15+ (Apple silicon & Intel) | **Cru-Media-Player-macOS.dmg** |
+            | Windows 10/11 (64-bit) | **Cru-Media-Player-Windows-Setup.exe** (or the portable .zip) |
+            | Linux x64 | **Cru-Media-Player-Linux-x64.tar.gz** (needs `libmpv2`) |
+
+            **macOS:** the app isn't notarized by Apple yet. After dragging it to
+            Applications, right-click it › **Open** › **Open** the first time
+            (or System Settings › Privacy & Security › **Open Anyway**).
+
+            **Windows:** SmartScreen may warn about an unrecognised app: click
+            **More info** › **Run anyway**.
+          files: |
+            Cru-Media-Player-macOS.dmg
+            Cru-Media-Player-Windows-Setup.exe
+            Cru-Media-Player-Windows-portable.zip
+            Cru-Media-Player-Linux-x64.tar.gz
